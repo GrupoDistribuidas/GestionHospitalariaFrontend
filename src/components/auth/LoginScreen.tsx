@@ -4,6 +4,8 @@ import logo from '../../assets/logo.png';
 
 const LoginScreen = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -18,10 +20,47 @@ const LoginScreen = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle login logic here
-    console.log('Login attempt:', formData);
+    
+    // Validar que se hayan ingresado usuario y contraseña
+    if (!formData.email || !formData.password) {
+      setError('Por favor ingrese usuario y contraseña');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:5088/api/Auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: formData.email,
+          password: formData.password
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Guardar token en localStorage
+        localStorage.setItem('authToken', data.token);
+        console.log('Login exitoso:', data.message);
+        // Aquí podrías redirigir al usuario o actualizar el estado de la aplicación
+        alert('Login exitoso: ' + data.message);
+      } else {
+        setError(data.message || 'Error en el login');
+      }
+    } catch (err) {
+      setError('Error de conexión. Verifique que el servidor esté funcionando.');
+      console.error('Error de login:', err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -75,13 +114,14 @@ const LoginScreen = () => {
                   <input
                     id="email"
                     name="email"
-                    type="email"
+                    type="text"
                     required
                     value={formData.email}
                     onChange={handleInputChange}
                     className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#035397] focus:border-[#035397] text-gray-900 placeholder-gray-500 transition-colors duration-200"
                     placeholder="Ingrese su usuario"
-                    autoComplete="email"
+                    autoComplete="username"
+                    disabled={isLoading}
                   />
                 </div>
               </div>
@@ -105,6 +145,7 @@ const LoginScreen = () => {
                     className="block w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#035397] focus:border-[#035397] text-gray-900 placeholder-gray-500 transition-colors duration-200"
                     placeholder="Ingrese su contraseña"
                     autoComplete="current-password"
+                    disabled={isLoading}
                   />
                   <button
                     type="button"
@@ -123,13 +164,34 @@ const LoginScreen = () => {
               {/* Remember Me & Forgot Password */}
            
 
+              {/* Error Message */}
+              {error && (
+                <div className="bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg text-sm">
+                  {error}
+                </div>
+              )}
+
               {/* Sign In Button */}
               <button
                 type="submit"
-                className="w-full bg-[#035397] hover:bg-blue-800 text-white font-bold py-2.5 px-4 rounded-lg transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-blue-300 flex items-center justify-center group"
+                disabled={isLoading}
+                className={`w-full font-bold py-2.5 px-4 rounded-lg transition-all duration-200 transform focus:outline-none focus:ring-4 focus:ring-blue-300 flex items-center justify-center group ${
+                  isLoading 
+                    ? 'bg-gray-400 cursor-not-allowed' 
+                    : 'bg-[#035397] hover:bg-blue-800 text-white hover:scale-[1.02] active:scale-[0.98]'
+                }`}
               >
-               Ingresar
-                <ChevronRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Ingresando...
+                  </>
+                ) : (
+                  <>
+                    Ingresar
+                    <ChevronRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-200" />
+                  </>
+                )}
               </button>
             </form>
 
