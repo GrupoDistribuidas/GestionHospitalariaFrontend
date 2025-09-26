@@ -19,3 +19,23 @@
 - Icons: Use lucide-react (e.g., Home, User, Users, Stethoscope).
 - Responsive: Mobile - hamburger toggle for sidebar overlay; Desktop - fixed sidebar.
 - After each step, update TODO.md with [x] for completed.
+
+# TODO: Implement Medicos Management Page
+
+## Steps to Complete:
+
+1. [x] Create src/components/dashboard/MedicosManagement.tsx: Implement tabbed component for Personal Medico and Gestión Especialidades, with API fetches, search, tables, modals for CRUD.
+
+2. [x] Update src/App.tsx: Import MedicosManagement, replace /perfil route placeholder, add /especialidades redirect to /perfil?tab=especialidades.
+
+3. [] Test: Run npm run dev, navigate to /perfil, verify UI loads, data fetches from APIs, tabs switch, search works, actions (CRUD modals) function without errors.
+
+## Notes:
+
+- API base: http://localhost:5000/api
+
+- Use fetch with Authorization header.
+
+- Match UI from image: Blue header, search input, tables with badges, icons for actions.
+
+- Handle loading, errors, refresh after CRUD.
