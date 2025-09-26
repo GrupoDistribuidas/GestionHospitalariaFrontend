@@ -11,6 +11,8 @@ import LoginScreen from "./components/auth/LoginScreen";
 import Layout from "./components/layout/Layout";
 import Dashboard from "./components/dashboard/Dashboard";
 import MedicosManagement from "./components/dashboard/MedicosManagement";
+import UsuariosManagement from "./components/dashboard/UsuariosManagement";
+import PerfilPersonal from "./components/dashboard/PerfilPersonal";
 
 function App() {
   return (
@@ -38,7 +40,15 @@ function App() {
           path="/usuarios"
           element={
             <Layout>
-              <div>Gestión de Usuarios</div>
+              <UsuariosManagement />
+            </Layout>
+          }
+        />
+        <Route
+          path="/mi-perfil"
+          element={
+            <Layout>
+              <PerfilPersonal />
             </Layout>
           }
         />

@@ -55,7 +55,21 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
               }`}
             >
               <User className="w-5 h-5 mr-3" />
-              Gestion Médicos
+              Personal Médico
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/mi-perfil"
+              onClick={() => handleLinkClick("/mi-perfil")}
+              className={`flex items-center p-2 rounded transition-colors duration-200 ${
+                isActive("/mi-perfil")
+                  ? "bg-[#035397] text-white"
+                  : "hover:bg-gray-800"
+              }`}
+            >
+              <User className="w-5 h-5 mr-3" />
+              Perfil Personal
             </Link>
           </li>
           <li>

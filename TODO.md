@@ -1,41 +1,39 @@
-# TODO: Implement Welcome Dashboard Page
+# TODO: Implementation Plan for Gestión de Usuarios and Perfil Personal
 
-## Steps to Complete:
+Based on the approved plan, here are the logical steps to implement the features:
 
-1. [x] Update main.tsx: Wrap root in BrowserRouter from react-router-dom.
-2. [x] Create src/components/layout/Sidebar.tsx: Modular sidebar component with navigation links, responsive design.
-3. [x] Create src/components/layout/Header.tsx: Modular header component with user info and logout.
-4. [x] Create src/components/layout/Layout.tsx: Wrapper for sidebar, header, and main content, responsive flex layout.
-5. [x] Update App.tsx: Implement Routes (/login public, /dashboard protected), use Layout for protected routes, auth check with localStorage token.
-6. [x] Update LoginScreen.tsx: Import useNavigate, on login success store token and navigate to /dashboard, remove alert.
-7. [x] Create src/components/dashboard/DashboardContent.tsx: Fetch stats from backend report endpoints, display welcome title, stat cards (Agenda Pendiente, Resumen General, Calendario), buttons (Agenda Cita, Calendario) with navigation stubs.
-8. [x] Create src/components/dashboard/Dashboard.tsx: Use Layout with DashboardContent as main content.
-9. [x] Test: Run dev server, login, verify redirect, data fetch, responsive UI on mobile/desktop, no breakage to login.
+- [x] Step 1: Create src/components/dashboard/UsuariosManagement.tsx
 
-## Notes:
+  - New component modeled after MedicosManagement.tsx.
+  - Implement data fetching from /api/usuarios.
+  - Add table with columns: Nombre, Email, Rol, Estado, Acciones.
+  - Include search/filtering, modals for CRUD (create/edit/view/delete), notifications, status badges.
+  - Handlers: fetchData, handleCreateUsuario, handleUpdateUsuario, handleDeleteUsuario.
 
-- Use TailwindCSS for all styling, match screenshot layout/colors (blue #035397, dark sidebar, white main).
-- Fetch endpoints: /api/Reportes/resumen-general, /api/Reportes/estadisticas-consultas, /api/Reportes/estadisticas-pacientes with Authorization: Bearer {token}.
-- Icons: Use lucide-react (e.g., Home, User, Users, Stethoscope).
-- Responsive: Mobile - hamburger toggle for sidebar overlay; Desktop - fixed sidebar.
-- After each step, update TODO.md with [x] for completed.
+- [x] Step 2: Create src/components/dashboard/PerfilPersonal.tsx
 
-# TODO: Implement Medicos Management Page
+  - New display-only component.
+  - Fetch current user profile from /api/usuario/perfil on mount.
+  - Layout: Header with avatar/name/rol/status, grid sections for Información Personal, Laboral, Contacto.
+  - Use consistent styling with loading/error states.
 
-## Steps to Complete:
+- [x] Step 3: Update src/App.tsx
 
-1. [x] Create src/components/dashboard/MedicosManagement.tsx: Implement tabbed component for Personal Medico and Gestión Especialidades, with API fetches, search, tables, modals for CRUD.
+  - Import UsuariosManagement and PerfilPersonal.
+  - Update /usuarios route to render <UsuariosManagement />.
+  - Add new route /mi-perfil to render <PerfilPersonal /> within Layout.
 
-2. [x] Update src/App.tsx: Import MedicosManagement, replace /perfil route placeholder, add /especialidades redirect to /perfil?tab=especialidades.
+- [x] Step 4: Update src/components/layout/Sidebar.tsx
 
-3. [] Test: Run npm run dev, navigate to /perfil, verify UI loads, data fetches from APIs, tabs switch, search works, actions (CRUD modals) function without errors.
+  - Change /perfil link label from "Gestion Médicos" to "Personal Médico".
+  - Add new link for /mi-perfil: User icon, label "Perfil Personal" (after Personal Médico link).
 
-## Notes:
+- [x] Step 5: Testing and Verification
+  - Run dev server (npm run dev).
+  - Navigate to /usuarios: Verify table loads, search works, CRUD modals function (assume API responses).
+  - Navigate to /mi-perfil: Verify profile data displays correctly.
+  - Check responsive design, auth redirects, error handling.
+  - Use browser_action for UI screenshots if needed.
+  - Note: Without backend, 404 errors are expected; components show error states with retry buttons.
 
-- API base: http://localhost:5000/api
-
-- Use fetch with Authorization header.
-
-- Match UI from image: Blue header, search input, tables with badges, icons for actions.
-
-- Handle loading, errors, refresh after CRUD.
+Progress will be updated as steps are completed.

@@ -193,6 +193,7 @@ const MedicosManagement: React.FC = () => {
         }),
       });
       if (!res.ok) throw new Error("Error creating medico");
+      alert("Médico creado exitosamente");
       setNotification({
         message: "El médico ha sido creado exitosamente.",
         type: "success",
@@ -201,6 +202,7 @@ const MedicosManagement: React.FC = () => {
       setShowModal("none");
       setFormData({});
     } catch (err) {
+      alert("Error creando médico: " + (err instanceof Error ? err.message : "Error desconocido"));
       setNotification({
         message:
           "Error creando médico: " +
@@ -231,6 +233,7 @@ const MedicosManagement: React.FC = () => {
         }
       );
       if (!res.ok) throw new Error("Error updating medico");
+      alert("Médico actualizado exitosamente");
       setNotification({
         message: "El médico ha sido actualizado exitosamente.",
         type: "success",
@@ -238,6 +241,10 @@ const MedicosManagement: React.FC = () => {
       fetchData();
       setShowModal("none");
     } catch (err) {
+      alert(
+        "Error actualizando médico: " +
+          (err instanceof Error ? err.message : "Error desconocido")
+      );
       setNotification({
         message:
           "Error actualizando médico: " +
@@ -260,6 +267,7 @@ const MedicosManagement: React.FC = () => {
         }
       );
       if (!res.ok) throw new Error("Error deleting medico");
+      alert("Médico eliminado exitosamente");
       setNotification({
         message: "El médico ha sido eliminado exitosamente.",
         type: "success",
@@ -267,6 +275,10 @@ const MedicosManagement: React.FC = () => {
       fetchData();
       setShowModal("none");
     } catch (err) {
+      alert(
+        "Error eliminando médico: " +
+          (err instanceof Error ? err.message : "Error desconocido")
+      );
       setNotification({
         message:
           "Error eliminando médico: " +
@@ -294,6 +306,7 @@ const MedicosManagement: React.FC = () => {
         }),
       });
       if (!res.ok) throw new Error("Error creating especialidad");
+      alert("Especialidad creada exitosamente");
       setNotification({
         message: "La especialidad ha sido creada exitosamente.",
         type: "success",
@@ -302,6 +315,10 @@ const MedicosManagement: React.FC = () => {
       setShowModal("none");
       setFormData({});
     } catch (err) {
+      alert(
+        "Error creando especialidad: " +
+          (err instanceof Error ? err.message : "Error desconocido")
+      );
       setNotification({
         message:
           "Error creando especialidad: " +
@@ -332,6 +349,7 @@ const MedicosManagement: React.FC = () => {
         }
       );
       if (!res.ok) throw new Error("Error updating especialidad");
+      alert("Especialidad actualizada exitosamente");
       setNotification({
         message: "La especialidad ha sido actualizada exitosamente.",
         type: "success",
@@ -339,6 +357,10 @@ const MedicosManagement: React.FC = () => {
       fetchData();
       setShowModal("none");
     } catch (err) {
+      alert(
+        "Error actualizando especialidad: " +
+          (err instanceof Error ? err.message : "Error desconocido")
+      );
       setNotification({
         message:
           "Error actualizando especialidad: " +
@@ -361,6 +383,7 @@ const MedicosManagement: React.FC = () => {
         }
       );
       if (!res.ok) throw new Error("Error deleting especialidad");
+      alert("Especialidad eliminada exitosamente");
       setNotification({
         message: "La especialidad ha sido eliminada exitosamente.",
         type: "success",
@@ -368,6 +391,10 @@ const MedicosManagement: React.FC = () => {
       fetchData();
       setShowModal("none");
     } catch (err) {
+      alert(
+        "Error eliminando especialidad: " +
+          (err instanceof Error ? err.message : "Error desconocido")
+      );
       setNotification({
         message:
           "Error eliminando especialidad: " +
