@@ -10,6 +10,7 @@ import {
 import LoginScreen from "./components/auth/LoginScreen";
 import Layout from "./components/layout/Layout";
 import Dashboard from "./components/dashboard/Dashboard";
+import MedicosManagement from "./components/dashboard/MedicosManagement";
 
 function App() {
   return (
@@ -29,7 +30,7 @@ function App() {
           path="/perfil"
           element={
             <Layout>
-              <div>Perfil Médico</div>
+              <MedicosManagement />
             </Layout>
           }
         />
@@ -43,11 +44,7 @@ function App() {
         />
         <Route
           path="/especialidades"
-          element={
-            <Layout>
-              <div>Gestión de Especialidades</div>
-            </Layout>
-          }
+          element={<Navigate to="/perfil?tab=especialidades" replace />}
         />
       </Route>
     </Routes>

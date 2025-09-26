@@ -55,7 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
               }`}
             >
               <User className="w-5 h-5 mr-3" />
-              Perfil Médico
+              Gestion Médicos
             </Link>
           </li>
           <li>
