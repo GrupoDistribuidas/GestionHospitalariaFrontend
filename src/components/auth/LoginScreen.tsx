@@ -1,63 +1,80 @@
-import React, { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock, Heart, Shield, ChevronRight } from 'lucide-react';
-import logo from '../../assets/logo.png';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  Heart,
+  Shield,
+  ChevronRight,
+} from "lucide-react";
+import logo from "../../assets/logo.png";
 
 const LoginScreen = () => {
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    rememberMe: false
+    email: "",
+    password: "",
+    rememberMe: false,
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validar que se hayan ingresado usuario y contraseña
     if (!formData.email || !formData.password) {
-      setError('Por favor ingrese usuario y contraseña');
+      setError("Por favor ingrese usuario y contraseña");
       return;
     }
 
     setIsLoading(true);
-    setError('');
+    setError("");
 
     try {
-      const response = await fetch('http://localhost:5088/api/Auth/login', {
-        method: 'POST',
+      const response = await fetch("http://localhost:5088/api/Auth/login", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           username: formData.email,
-          password: formData.password
-        })
+          password: formData.password,
+        }),
       });
 
       const data = await response.json();
 
       if (data.success) {
         // Guardar token en localStorage
-        localStorage.setItem('authToken', data.token);
-        console.log('Login exitoso:', data.message);
-        // Aquí podrías redirigir al usuario o actualizar el estado de la aplicación
-        alert('Login exitoso: ' + data.message);
+        localStorage.setItem("authToken", data.token);
+        // Guardar username del formulario como nombre del usuario
+        localStorage.setItem("username", formData.email);
+        // Guardar datos del usuario si están disponibles
+        if (data.user) {
+          localStorage.setItem("userData", JSON.stringify(data.user));
+        }
+        console.log("Login exitoso:", data.message);
+        navigate("/dashboard");
       } else {
-        setError(data.message || 'Error en el login');
+        setError(data.message || "Error en el login");
       }
     } catch (err) {
-      setError('Error de conexión. Verifique que el servidor esté funcionando.');
-      console.error('Error de login:', err);
+      setError(
+        "Error de conexión. Verifique que el servidor esté funcionando."
+      );
+      console.error("Error de login:", err);
     } finally {
       setIsLoading(false);
     }
@@ -86,17 +103,18 @@ const LoginScreen = () => {
         <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
           {/* Header Section */}
           <div className="bg-[#035397] px-8 py-8 text-center relative">
-            
             <div className="flex justify-center mb-4">
               <div className="w-16 h-16 rounded-full flex items-center justify-center p-2">
-                <img 
-                  src={logo} 
-                  alt="Logo Gestión Hospitalaria" 
+                <img
+                  src={logo}
+                  alt="Logo Gestión Hospitalaria"
                   className="w-full h-full "
                 />
               </div>
             </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Gestión Hospitalaria</h1>
+            <h1 className="text-2xl font-bold text-white mb-2">
+              Gestión Hospitalaria
+            </h1>
           </div>
 
           {/* Form Section */}
@@ -104,7 +122,10 @@ const LoginScreen = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Email Field */}
               <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2 text-left">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-semibold text-gray-700 mb-2 text-left"
+                >
                   Usuario
                 </label>
                 <div className="relative">
@@ -128,7 +149,10 @@ const LoginScreen = () => {
 
               {/* Password Field */}
               <div>
-                <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2 text-left">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-semibold text-gray-700 mb-2 text-left"
+                >
                   Password
                 </label>
                 <div className="relative">
@@ -138,7 +162,7 @@ const LoginScreen = () => {
                   <input
                     id="password"
                     name="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     required
                     value={formData.password}
                     onChange={handleInputChange}
@@ -162,7 +186,6 @@ const LoginScreen = () => {
               </div>
 
               {/* Remember Me & Forgot Password */}
-           
 
               {/* Error Message */}
               {error && (
@@ -176,9 +199,9 @@ const LoginScreen = () => {
                 type="submit"
                 disabled={isLoading}
                 className={`w-full font-bold py-2.5 px-4 rounded-lg transition-all duration-200 transform focus:outline-none focus:ring-4 focus:ring-blue-300 flex items-center justify-center group ${
-                  isLoading 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-[#035397] hover:bg-blue-800 text-white hover:scale-[1.02] active:scale-[0.98]'
+                  isLoading
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-[#035397] hover:bg-blue-800 text-white hover:scale-[1.02] active:scale-[0.98]"
                 }`}
               >
                 {isLoading ? (
@@ -196,12 +219,8 @@ const LoginScreen = () => {
             </form>
 
             {/* Security Notice */}
-        
           </div>
         </div>
-
-      
-        
       </div>
     </div>
   );
