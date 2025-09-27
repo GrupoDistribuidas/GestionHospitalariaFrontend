@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, User, Users, Stethoscope, LogOut } from "lucide-react";
+import { Home, User, Users, Stethoscope, FileText, LogOut } from "lucide-react";
 
 interface SidebarProps {
   isMobileOpen?: boolean;
@@ -98,6 +98,20 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
             >
               <Stethoscope className="w-5 h-5 mr-3" />
               Gestión de Especialidades
+            </Link>
+          </li>
+          <li>
+            <Link
+              to="/reportes"
+              onClick={() => handleLinkClick("/reportes")}
+              className={`flex items-center p-2 rounded transition-colors duration-200 ${
+                isActive("/reportes")
+                  ? "bg-[#035397] text-white"
+                  : "hover:bg-gray-800"
+              }`}
+            >
+              <FileText className="w-5 h-5 mr-3" />
+              Reportes de Consultas
             </Link>
           </li>
         </ul>
