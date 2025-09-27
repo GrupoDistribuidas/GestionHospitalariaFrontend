@@ -13,6 +13,7 @@ import Dashboard from "./components/dashboard/Dashboard";
 import MedicosManagement from "./components/dashboard/MedicosManagement";
 import UsuariosManagement from "./components/dashboard/UsuariosManagement";
 import PerfilPersonal from "./components/dashboard/PerfilPersonal";
+import ConsultationReports from "./components/consultationReport/ConsultationReports";
 
 function App() {
   return (
@@ -49,6 +50,14 @@ function App() {
           element={
             <Layout>
               <PerfilPersonal />
+            </Layout>
+          }
+        />
+        <Route
+          path="/reportes"
+          element={
+            <Layout>
+              <ConsultationReports />
             </Layout>
           }
         />
