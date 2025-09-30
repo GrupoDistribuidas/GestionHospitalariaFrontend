@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, User, Users, Stethoscope, FileText, LogOut } from "lucide-react";
+import { Home, User, Users, Stethoscope, FileText, LogOut, HeartPulse } from "lucide-react"; // 👈 añadimos ícono representativo
 
 interface SidebarProps {
   isMobileOpen?: boolean;
@@ -44,6 +44,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
               Inicio
             </Link>
           </li>
+
           <li>
             <Link
               to="/perfil"
@@ -58,6 +59,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
               Personal Médico
             </Link>
           </li>
+
           <li>
             <Link
               to="/mi-perfil"
@@ -72,6 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
               Perfil Personal
             </Link>
           </li>
+
           <li>
             <Link
               to="/usuarios"
@@ -86,6 +89,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
               Gestión de Usuarios
             </Link>
           </li>
+
           <li>
             <Link
               to="/especialidades"
@@ -100,6 +104,23 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
               Gestión de Especialidades
             </Link>
           </li>
+
+          {/* 👇 Nueva opción: Pacientes */}
+          <li>
+            <Link
+              to="/pacientes"
+              onClick={() => handleLinkClick("/pacientes")}
+              className={`flex items-center p-2 rounded transition-colors duration-200 ${
+                isActive("/pacientes")
+                  ? "bg-[#035397] text-white"
+                  : "hover:bg-gray-800"
+              }`}
+            >
+              <HeartPulse className="w-5 h-5 mr-3" />
+              Gestión de Pacientes
+            </Link>
+          </li>
+
           <li>
             <Link
               to="/reportes"
@@ -115,6 +136,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
             </Link>
           </li>
         </ul>
+
+        {/* Logout */}
         <li className="mt-auto">
           <Link
             to="/login"

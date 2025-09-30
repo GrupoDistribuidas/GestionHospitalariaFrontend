@@ -6,6 +6,7 @@ interface Stats {
   pending: number;
   general: number;
   calendar: number;
+  patients: number; // 👈 nuevo
 }
 
 const DashboardContent: React.FC = () => {
@@ -13,6 +14,7 @@ const DashboardContent: React.FC = () => {
     pending: 0,
     general: 0,
     calendar: 0,
+    patients: 0, // 👈 nuevo
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -26,16 +28,11 @@ const DashboardContent: React.FC = () => {
       return;
     }
 
-    // Load username from localStorage
     const storedUsername = localStorage.getItem("username");
-    if (storedUsername) {
-      setUserName(storedUsername);
-    } else {
-      setUserName("Usuario");
-    }
+    setUserName(storedUsername ? storedUsername : "Usuario");
 
-    // Set static stats (backend endpoints not available)
-    setStats({ pending: 12, general: 84, calendar: 5 });
+    // TODO: reemplazar por endpoints reales cuando estén listos
+    setStats({ pending: 12, general: 84, calendar: 5, patients: 132 });
     setLoading(false);
   }, [navigate]);
 
@@ -49,13 +46,9 @@ const DashboardContent: React.FC = () => {
 
   const hour = new Date().getHours();
   let greeting = "BIENVENIDO";
-  if (hour >= 6 && hour < 12) {
-    greeting = "BUEN DÍA";
-  } else if (hour >= 12 && hour < 20) {
-    greeting = "BUENAS TARDES";
-  } else {
-    greeting = "BUENAS NOCHES";
-  }
+  if (hour >= 6 && hour < 12) greeting = "BUEN DÍA";
+  else if (hour >= 12 && hour < 20) greeting = "BUENAS TARDES";
+  else greeting = "BUENAS NOCHES";
 
   return (
     <div className="space-y-8 p-4">
@@ -70,7 +63,7 @@ const DashboardContent: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">{/* 👈 4 columnas */}
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transform hover:scale-105 transition-all duration-300 animate-fade-in">
           <div className="flex items-center">
             <div className="p-3 bg-blue-50 rounded-full mr-4">
@@ -80,9 +73,7 @@ const DashboardContent: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-700 mb-1">
                 Agenda Pendiente
               </h3>
-              <p className="text-3xl font-bold text-gray-900">
-                {stats.pending}
-              </p>
+              <p className="text-3xl font-bold text-gray-900">{stats.pending}</p>
               <p className="text-sm text-gray-500 mt-1">Citas por confirmar</p>
             </div>
           </div>
@@ -97,9 +88,7 @@ const DashboardContent: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-700 mb-1">
                 Resumen General
               </h3>
-              <p className="text-3xl font-bold text-gray-900">
-                {stats.general}
-              </p>
+              <p className="text-3xl font-bold text-gray-900">{stats.general}</p>
               <p className="text-sm text-gray-500 mt-1">Registros totales</p>
             </div>
           </div>
@@ -121,6 +110,27 @@ const DashboardContent: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* 👇 Nueva tarjeta Pacientes */}
+        <button
+          onClick={() => navigate("/pacientes")}
+          className="text-left bg-white p-6 rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transform hover:scale-105 transition-all duration-300 animate-fade-in focus:outline-none"
+        >
+          <div className="flex items-center">
+            <div className="p-3 bg-emerald-50 rounded-full mr-4">
+              <Users className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-700 mb-1">
+                Pacientes activos
+              </h3>
+              <p className="text-3xl font-bold text-gray-900">
+                {stats.patients}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">Ir a gestión</p>
+            </div>
+          </div>
+        </button>
       </div>
 
       {/* Quick Actions */}

@@ -1,17 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Search,
-  Plus,
-  Eye,
-  Edit,
-  Trash2,
-  Users,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  Loader2,
-} from "lucide-react";
+import { Search, Plus, Eye, Edit, Trash2, Users, AlertCircle, CheckCircle, XCircle, Loader2,} from "lucide-react";
 
 interface Usuario {
   idUsuario: number;
