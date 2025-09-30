@@ -1,13 +1,11 @@
-import { useEffect } from "react";
 import {
   Routes,
   Route,
-  useNavigate,
-  useLocation,
   Navigate,
   Outlet,
 } from "react-router-dom";
 import LoginScreen from "./components/auth/LoginScreen";
+import ForgotPasswordScreen from "./components/auth/ForgotPasswordScreen";
 import Layout from "./components/layout/Layout";
 import Dashboard from "./components/dashboard/Dashboard";
 import MedicosManagement from "./components/dashboard/MedicosManagement";
@@ -19,6 +17,7 @@ function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginScreen />} />
+      <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
       <Route path="/" element={<ProtectedRoute />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route
