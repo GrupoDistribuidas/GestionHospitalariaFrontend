@@ -186,6 +186,29 @@ const LoginScreen = () => {
               </div>
 
               {/* Remember Me & Forgot Password */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <input
+                    id="rememberMe"
+                    name="rememberMe"
+                    type="checkbox"
+                    checked={formData.rememberMe}
+                    onChange={handleInputChange}
+                    className="h-4 w-4 text-[#035397] focus:ring-[#035397] border-gray-300 rounded"
+                    disabled={isLoading}
+                  />
+                  <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-700">
+                    Recordarme
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/forgot-password')}
+                  className="text-sm text-[#035397] hover:text-blue-800 font-medium transition-colors duration-200"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
 
               {/* Error Message */}
               {error && (
