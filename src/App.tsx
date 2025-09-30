@@ -12,14 +12,17 @@ import MedicosManagement from "./components/dashboard/MedicosManagement";
 import UsuariosManagement from "./components/dashboard/UsuariosManagement";
 import PerfilPersonal from "./components/dashboard/PerfilPersonal";
 import ConsultationReports from "./components/consultationReport/ConsultationReports";
+import PacientesPage from "./components/dashboard/PacientesPage"; // 👈 NUEVO
 
 function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginScreen />} />
       <Route path="/forgot-password" element={<ForgotPasswordScreen />} />
+
       <Route path="/" element={<ProtectedRoute />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
+
         <Route
           path="/dashboard"
           element={
@@ -28,6 +31,7 @@ function App() {
             </Layout>
           }
         />
+
         <Route
           path="/perfil"
           element={
@@ -36,6 +40,7 @@ function App() {
             </Layout>
           }
         />
+
         <Route
           path="/usuarios"
           element={
@@ -44,6 +49,7 @@ function App() {
             </Layout>
           }
         />
+
         <Route
           path="/mi-perfil"
           element={
@@ -52,6 +58,7 @@ function App() {
             </Layout>
           }
         />
+
         <Route
           path="/reportes"
           element={
@@ -60,6 +67,17 @@ function App() {
             </Layout>
           }
         />
+
+        {/* 👇 NUEVO: ruta de Pacientes */}
+        <Route
+          path="/pacientes"
+          element={
+            <Layout>
+              <PacientesPage />
+            </Layout>
+          }
+        />
+
         <Route
           path="/especialidades"
           element={<Navigate to="/perfil?tab=especialidades" replace />}
