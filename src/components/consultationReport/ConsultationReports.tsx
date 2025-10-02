@@ -1,7 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  FileText, 
   Download, 
   RefreshCw, 
   Users, 
@@ -11,23 +10,44 @@ import {
   AlertCircle, 
   Loader2,
   Calendar,
-  X
+  X,
+  FileText,
+  File
 } from 'lucide-react';
 import { consultationService } from '../../services/consultationService';
+import { ExportService } from '../../services/exportService';
+import StatisticsCharts from './StatisticsCharts';
 import type { 
   ReporteConsultas, 
   FilterFormData, 
-  Medico
+  Medico,
+  StatisticsData
 } from '../../types/consultation';
 
 const ConsultationReports: React.FC = () => {
   const [reportData, setReportData] = useState<ReporteConsultas | null>(null);
+  const [statisticsData, setStatisticsData] = useState<StatisticsData | null>(null);
   const [medicosDisponibles, setMedicosDisponibles] = useState<Medico[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statisticsLoading, setStatisticsLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
   const [applying, setApplying] = useState(false);
   const [expandedMedicos, setExpandedMedicos] = useState<Set<number>>(new Set());
+  const [showDoctorDetails, setShowDoctorDetails] = useState(false); // Estado para la sección colapsable
+  const [showExportModal, setShowExportModal] = useState(false); // Estado para el modal de exportación
+  const [isExporting, setIsExporting] = useState(false); // Estado para mostrar loading durante la exportación
+  const [fileName, setFileName] = useState(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.toLocaleDateString('es-ES', { month: 'long' });
+    return `reporte-consultas-${month}-${year}`;
+  });
+  
+  // Estados para exportación individual
+  const [showDoctorExportModal, setShowDoctorExportModal] = useState(false);
+  const [selectedDoctor, setSelectedDoctor] = useState<any>(null);
+  const [doctorFileName, setDoctorFileName] = useState('');
   
   // Estados para el selector de médicos con búsqueda
   const [medicoSearchTerm, setMedicoSearchTerm] = useState<string>('');
@@ -69,17 +89,32 @@ const ConsultationReports: React.FC = () => {
 
   const initializeData = async () => {
     setLoading(true);
+    setStatisticsLoading(true);
     setError('');
     
     try {
-      // Cargar médicos disponibles y reporte inicial
-      const [medicosResponse, reporteResponse] = await Promise.all([
+      // Cargar médicos disponibles, reporte inicial y estadísticas
+      const [medicosResponse, reporteResponse, estadisticasResponse] = await Promise.all([
         consultationService.fetchMedicosDisponibles(),
-        consultationService.fetchConsultationReports()
+        consultationService.fetchConsultationReports(),
+        consultationService.fetchEstadisticasConsultas()
       ]);
       
       setMedicosDisponibles(medicosResponse);
-      setReportData(reporteResponse);
+      
+      // Enriquecer reporte con nombres reales de especialidades
+      const enrichedReport = consultationService.enrichReportWithRealSpecialtyNames(
+        reporteResponse, 
+        medicosResponse
+      );
+      setReportData(enrichedReport);
+      
+      // Enriquecer estadísticas con nombres reales de especialidades
+      const enrichedStatistics = consultationService.enrichStatisticsWithRealSpecialtyNames(
+        estadisticasResponse, 
+        medicosResponse
+      );
+      setStatisticsData(enrichedStatistics);
       
       // Si hay un médico seleccionado, actualizar el término de búsqueda
       if (filters.idMedico) {
@@ -98,6 +133,7 @@ const ConsultationReports: React.FC = () => {
       }
     } finally {
       setLoading(false);
+      setStatisticsLoading(false);
     }
   };
 
@@ -160,8 +196,25 @@ const ConsultationReports: React.FC = () => {
         cleanedFilters.diagnostico = filters.diagnostico.trim();
       }
 
-      const reporte = await consultationService.fetchConsultationReports(cleanedFilters);
-      setReportData(reporte);
+      // Cargar reporte y estadísticas con filtros aplicados
+      const [reporte, estadisticas] = await Promise.all([
+        consultationService.fetchConsultationReports(cleanedFilters),
+        consultationService.fetchEstadisticasConsultas(cleanedFilters)
+      ]);
+      
+      // Enriquecer reporte con nombres reales de especialidades
+      const enrichedReport = consultationService.enrichReportWithRealSpecialtyNames(
+        reporte, 
+        medicosDisponibles
+      );
+      setReportData(enrichedReport);
+      
+      // Enriquecer estadísticas con nombres reales de especialidades
+      const enrichedStatistics = consultationService.enrichStatisticsWithRealSpecialtyNames(
+        estadisticas, 
+        medicosDisponibles
+      );
+      setStatisticsData(enrichedStatistics);
     } catch (err) {
       console.error('Error applying filters:', err);
       setError(err instanceof Error ? err.message : 'Error aplicando filtros');
@@ -205,21 +258,71 @@ const ConsultationReports: React.FC = () => {
     });
   };
 
-  const handleExport = async () => {
+  const handleExport = () => {
+    setShowExportModal(true);
+  };
+
+  const handleExportFormat = async (format: 'pdf' | 'excel') => {
+    setIsExporting(true);
     try {
-      const blob = await consultationService.exportConsultationData({ format: 'csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `reporte-consultas-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      if (!reportData) {
+        throw new Error('No hay datos para exportar');
+      }
+
+      const cleanFileName = fileName.trim() || 'reporte-consultas';
+      
+      if (format === 'pdf') {
+        ExportService.exportToPDF(reportData, statisticsData, cleanFileName);
+      } else {
+        ExportService.exportToExcel(reportData, statisticsData, cleanFileName);
+      }
+      
+      setShowExportModal(false);
     } catch (err) {
       console.error('Error exporting data:', err);
       setError('Error exportando datos');
+    } finally {
+      setIsExporting(false);
     }
+  };
+
+  const closeExportModal = () => {
+    setShowExportModal(false);
+  };
+
+  const handleDoctorExport = (medico: any) => {
+    setSelectedDoctor(medico);
+    const defaultName = `reporte-${medico.nombreMedico.replace(/\s+/g, '-').toLowerCase()}-${new Date().toLocaleDateString('es-ES').replace(/\//g, '-')}`;
+    setDoctorFileName(defaultName);
+    setShowDoctorExportModal(true);
+  };
+
+  const handleDoctorExportFormat = async (format: 'pdf' | 'excel') => {
+    if (!selectedDoctor) return;
+    
+    setIsExporting(true);
+    try {
+      const cleanFileName = doctorFileName.trim() || `reporte-${selectedDoctor.nombreMedico}`;
+      
+      if (format === 'pdf') {
+        ExportService.exportDoctorToPDF(selectedDoctor, cleanFileName);
+      } else {
+        ExportService.exportDoctorToExcel(selectedDoctor, cleanFileName);
+      }
+      
+      setShowDoctorExportModal(false);
+      setSelectedDoctor(null);
+    } catch (err) {
+      console.error('Error al exportar reporte del médico:', err);
+      setError('Error exportando reporte del médico');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const closeDoctorExportModal = () => {
+    setShowDoctorExportModal(false);
+    setSelectedDoctor(null);
   };
 
   if (loading) {
@@ -453,62 +556,56 @@ const ConsultationReports: React.FC = () => {
         )}
       </div>
 
-      {/* Summary Section */}
-      <div className="bg-white rounded-lg shadow mb-6 p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-800">Resumen de Consultas</h2>
-          <p className="text-sm text-gray-500">Generado: {reportData.resumen.fechaGeneracion}</p>
+     
+
+      {/* Dashboard de Estadísticas */}
+      {statisticsData && (
+        <div className="mb-6">
+        
+          
+          <StatisticsCharts 
+            statistics={statisticsData}
+            consultationsByDoctor={reportData ? consultationService.transformDataForCharts(reportData) : []}
+            isLoading={statisticsLoading}
+          />
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-blue-50 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600">Total Consultas</p>
-                <p className="text-2xl font-bold text-blue-800">{reportData.resumen.totalConsultas}</p>
-              </div>
-              <FileText className="w-8 h-8 text-blue-600" />
-            </div>
-          </div>
-
-          <div className="bg-green-50 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600">Médicos Activos</p>
-                <p className="text-2xl font-bold text-green-800">{reportData.resumen.medicosActivos}</p>
-              </div>
-              <Users className="w-8 h-8 text-green-600" />
-            </div>
-          </div>
-
-          <div className="bg-purple-50 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-600">Filtros Activos</p>
-                <p className="text-2xl font-bold text-purple-800">{reportData.resumen.filtrosActivos}</p>
-              </div>
-              <Filter className="w-8 h-8 text-purple-600" />
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Doctors and Consultations Section */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">Consultas por Médico</h2>
             <button 
-              onClick={handleExport}
-              className="flex items-center space-x-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+              onClick={() => setShowDoctorDetails(!showDoctorDetails)}
+              className="flex items-center space-x-2 text-lg font-semibold text-gray-800 hover:text-gray-600 transition-colors"
             >
-              <Download className="w-4 h-4" />
-              <span>Exportar</span>
+              <span>Consultas Detalladas por Médico</span>
+              {showDoctorDetails ? (
+                <ChevronUp className="w-5 h-5" />
+              ) : (
+                <ChevronDown className="w-5 h-5" />
+              )}
             </button>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-500">
+                {reportData?.medicosPorConsultas.length} médicos • {reportData?.resumen.totalConsultas} consultas totales
+              </span>
+              <button 
+                onClick={handleExport}
+                className="flex items-center space-x-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+              >
+                <Download className="w-4 h-4" />
+                <span>Exportar</span>
+              </button>
+            </div>
           </div>
+          <p className="text-sm text-gray-500 mt-2">
+            Generado: {reportData?.resumen.fechaGeneracion} • 0 filtros activos
+          </p>
         </div>
 
-        <div className="divide-y divide-gray-200">
+        {showDoctorDetails && (
+          <div className="divide-y divide-gray-200">
           {reportData.medicosPorConsultas.length === 0 ? (
             <div className="px-6 py-8 text-center text-gray-500">
               No se encontraron consultas con los filtros aplicados
@@ -538,7 +635,11 @@ const ConsultationReports: React.FC = () => {
                     </div>
                     
                     <div className="flex items-center space-x-2">
-                      <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200">
+                      <button 
+                        onClick={() => handleDoctorExport(medico)}
+                        className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                        title={`Exportar reporte de ${medico.nombreMedico}`}
+                      >
                         <Download className="w-4 h-4" />
                       </button>
                       {expandedMedicos.has(medico.idMedico) ? (
@@ -591,7 +692,238 @@ const ConsultationReports: React.FC = () => {
             ))
           )}
         </div>
+        )}
       </div>
+
+      {/* Modal de Exportación */}
+      {showExportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-gray-100">
+            {/* Header del Modal */}
+            <div className="px-6 pt-6 pb-4 text-center bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-gray-100">
+              <div className="flex justify-center mb-3">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Download className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">
+                Exportar Reporte
+              </h3>
+              <p className="text-sm text-gray-600">
+                Selecciona el formato y personaliza el nombre del archivo
+              </p>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="px-6 py-6">
+              {/* Campo para nombre del archivo */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-2 text-left">
+                  Nombre del archivo
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={fileName}
+                    onChange={(e) => setFileName(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 text-gray-900 placeholder-gray-500 transition-colors duration-200"
+                    placeholder="Nombre del archivo"
+                    disabled={isExporting}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  La extensión se agregará automáticamente
+                </p>
+              </div>
+
+              {/* Opciones de formato */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3 text-left">
+                  Formato de exportación
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Botón PDF */}
+                  <button
+                    onClick={() => handleExportFormat('pdf')}
+                    disabled={isExporting}
+                    className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center mb-2 group-hover:bg-red-200 transition-colors">
+                      <FileText className="w-5 h-5 text-red-600" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-700 group-hover:text-red-700">
+                      PDF
+                    </span>
+                    <span className="text-xs text-gray-500 mt-1">
+                      Documento portable
+                    </span>
+                  </button>
+
+                  {/* Botón Excel */}
+                  <button
+                    onClick={() => handleExportFormat('excel')}
+                    disabled={isExporting}
+                    className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-xl hover:border-green-300 hover:bg-green-50 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mb-2 group-hover:bg-green-200 transition-colors">
+                      <File className="w-5 h-5 text-green-600" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-700 group-hover:text-green-700">
+                      Excel
+                    </span>
+                    <span className="text-xs text-gray-500 mt-1">
+                      Hoja de cálculo
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Estado de carga */}
+              {isExporting && (
+                <div className="flex items-center justify-center p-4 bg-blue-50 rounded-lg border border-blue-200 mb-4">
+                  <Loader2 className="animate-spin h-5 w-5 text-blue-600 mr-2" />
+                  <span className="text-sm text-blue-700 font-medium">
+                    Generando archivo...
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={closeExportModal}
+                  disabled={isExporting}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancelar
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 text-center mt-3">
+                Los datos se exportarán según los filtros aplicados actualmente
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Exportación Individual de Médico */}
+      {showDoctorExportModal && selectedDoctor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            {/* Header del Modal */}
+            <div className="px-6 py-4 border-b border-gray-100">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Exportar Reporte Individual
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {selectedDoctor.nombreMedico} - {selectedDoctor.especialidad}
+                  </p>
+                </div>
+                <button
+                  onClick={closeDoctorExportModal}
+                  disabled={isExporting}
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="px-6 py-4">
+              {/* Campo de nombre de archivo */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nombre del archivo
+                </label>
+                <input
+                  type="text"
+                  value={doctorFileName}
+                  onChange={(e) => setDoctorFileName(e.target.value)}
+                  disabled={isExporting}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  placeholder="Ingrese el nombre del archivo"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Se agregará automáticamente la extensión según el formato seleccionado
+                </p>
+              </div>
+
+              {/* Opciones de formato */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-3">
+                  Seleccione el formato de exportación
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  {/* Botón PDF */}
+                  <button
+                    onClick={() => handleDoctorExportFormat('pdf')}
+                    disabled={isExporting}
+                    className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-xl hover:border-red-300 hover:bg-red-50 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center mb-2 group-hover:bg-red-200 transition-colors">
+                      <FileText className="w-5 h-5 text-red-600" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-700 group-hover:text-red-700">
+                      PDF
+                    </span>
+                    <span className="text-xs text-gray-500 mt-1">
+                      Documento
+                    </span>
+                  </button>
+
+                  {/* Botón Excel */}
+                  <button
+                    onClick={() => handleDoctorExportFormat('excel')}
+                    disabled={isExporting}
+                    className="flex flex-col items-center p-4 border-2 border-gray-200 rounded-xl hover:border-green-300 hover:bg-green-50 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center mb-2 group-hover:bg-green-200 transition-colors">
+                      <File className="w-5 h-5 text-green-600" />
+                    </div>
+                    <span className="text-sm font-medium text-gray-700 group-hover:text-green-700">
+                      Excel
+                    </span>
+                    <span className="text-xs text-gray-500 mt-1">
+                      Hoja de cálculo
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Estado de carga */}
+              {isExporting && (
+                <div className="flex items-center justify-center p-4 bg-blue-50 rounded-lg border border-blue-200 mb-4">
+                  <Loader2 className="animate-spin h-5 w-5 text-blue-600 mr-2" />
+                  <span className="text-sm text-blue-700 font-medium">
+                    Generando archivo del médico...
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Footer del Modal */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={closeDoctorExportModal}
+                  disabled={isExporting}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancelar
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 text-center mt-3">
+                Se exportarán todas las consultas registradas para este médico
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
