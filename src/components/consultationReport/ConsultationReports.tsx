@@ -1,7 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  FileText, 
   Download, 
   RefreshCw, 
   Users, 
@@ -14,20 +13,25 @@ import {
   X
 } from 'lucide-react';
 import { consultationService } from '../../services/consultationService';
+import StatisticsCharts from './StatisticsCharts';
 import type { 
   ReporteConsultas, 
   FilterFormData, 
-  Medico
+  Medico,
+  StatisticsData
 } from '../../types/consultation';
 
 const ConsultationReports: React.FC = () => {
   const [reportData, setReportData] = useState<ReporteConsultas | null>(null);
+  const [statisticsData, setStatisticsData] = useState<StatisticsData | null>(null);
   const [medicosDisponibles, setMedicosDisponibles] = useState<Medico[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statisticsLoading, setStatisticsLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
   const [applying, setApplying] = useState(false);
   const [expandedMedicos, setExpandedMedicos] = useState<Set<number>>(new Set());
+  const [showDoctorDetails, setShowDoctorDetails] = useState(false); // Estado para la sección colapsable
   
   // Estados para el selector de médicos con búsqueda
   const [medicoSearchTerm, setMedicoSearchTerm] = useState<string>('');
@@ -69,17 +73,32 @@ const ConsultationReports: React.FC = () => {
 
   const initializeData = async () => {
     setLoading(true);
+    setStatisticsLoading(true);
     setError('');
     
     try {
-      // Cargar médicos disponibles y reporte inicial
-      const [medicosResponse, reporteResponse] = await Promise.all([
+      // Cargar médicos disponibles, reporte inicial y estadísticas
+      const [medicosResponse, reporteResponse, estadisticasResponse] = await Promise.all([
         consultationService.fetchMedicosDisponibles(),
-        consultationService.fetchConsultationReports()
+        consultationService.fetchConsultationReports(),
+        consultationService.fetchEstadisticasConsultas()
       ]);
       
       setMedicosDisponibles(medicosResponse);
-      setReportData(reporteResponse);
+      
+      // Enriquecer reporte con nombres reales de especialidades
+      const enrichedReport = consultationService.enrichReportWithRealSpecialtyNames(
+        reporteResponse, 
+        medicosResponse
+      );
+      setReportData(enrichedReport);
+      
+      // Enriquecer estadísticas con nombres reales de especialidades
+      const enrichedStatistics = consultationService.enrichStatisticsWithRealSpecialtyNames(
+        estadisticasResponse, 
+        medicosResponse
+      );
+      setStatisticsData(enrichedStatistics);
       
       // Si hay un médico seleccionado, actualizar el término de búsqueda
       if (filters.idMedico) {
@@ -98,6 +117,7 @@ const ConsultationReports: React.FC = () => {
       }
     } finally {
       setLoading(false);
+      setStatisticsLoading(false);
     }
   };
 
@@ -160,8 +180,25 @@ const ConsultationReports: React.FC = () => {
         cleanedFilters.diagnostico = filters.diagnostico.trim();
       }
 
-      const reporte = await consultationService.fetchConsultationReports(cleanedFilters);
-      setReportData(reporte);
+      // Cargar reporte y estadísticas con filtros aplicados
+      const [reporte, estadisticas] = await Promise.all([
+        consultationService.fetchConsultationReports(cleanedFilters),
+        consultationService.fetchEstadisticasConsultas(cleanedFilters)
+      ]);
+      
+      // Enriquecer reporte con nombres reales de especialidades
+      const enrichedReport = consultationService.enrichReportWithRealSpecialtyNames(
+        reporte, 
+        medicosDisponibles
+      );
+      setReportData(enrichedReport);
+      
+      // Enriquecer estadísticas con nombres reales de especialidades
+      const enrichedStatistics = consultationService.enrichStatisticsWithRealSpecialtyNames(
+        estadisticas, 
+        medicosDisponibles
+      );
+      setStatisticsData(enrichedStatistics);
     } catch (err) {
       console.error('Error applying filters:', err);
       setError(err instanceof Error ? err.message : 'Error aplicando filtros');
@@ -453,62 +490,56 @@ const ConsultationReports: React.FC = () => {
         )}
       </div>
 
-      {/* Summary Section */}
-      <div className="bg-white rounded-lg shadow mb-6 p-6">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-gray-800">Resumen de Consultas</h2>
-          <p className="text-sm text-gray-500">Generado: {reportData.resumen.fechaGeneracion}</p>
+     
+
+      {/* Dashboard de Estadísticas */}
+      {statisticsData && (
+        <div className="mb-6">
+        
+          
+          <StatisticsCharts 
+            statistics={statisticsData}
+            consultationsByDoctor={reportData ? consultationService.transformDataForCharts(reportData) : []}
+            isLoading={statisticsLoading}
+          />
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-blue-50 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-blue-600">Total Consultas</p>
-                <p className="text-2xl font-bold text-blue-800">{reportData.resumen.totalConsultas}</p>
-              </div>
-              <FileText className="w-8 h-8 text-blue-600" />
-            </div>
-          </div>
-
-          <div className="bg-green-50 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-green-600">Médicos Activos</p>
-                <p className="text-2xl font-bold text-green-800">{reportData.resumen.medicosActivos}</p>
-              </div>
-              <Users className="w-8 h-8 text-green-600" />
-            </div>
-          </div>
-
-          <div className="bg-purple-50 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-600">Filtros Activos</p>
-                <p className="text-2xl font-bold text-purple-800">{reportData.resumen.filtrosActivos}</p>
-              </div>
-              <Filter className="w-8 h-8 text-purple-600" />
-            </div>
-          </div>
-        </div>
-      </div>
+      )}
 
       {/* Doctors and Consultations Section */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-800">Consultas por Médico</h2>
             <button 
-              onClick={handleExport}
-              className="flex items-center space-x-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+              onClick={() => setShowDoctorDetails(!showDoctorDetails)}
+              className="flex items-center space-x-2 text-lg font-semibold text-gray-800 hover:text-gray-600 transition-colors"
             >
-              <Download className="w-4 h-4" />
-              <span>Exportar</span>
+              <span>Consultas Detalladas por Médico</span>
+              {showDoctorDetails ? (
+                <ChevronUp className="w-5 h-5" />
+              ) : (
+                <ChevronDown className="w-5 h-5" />
+              )}
             </button>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-500">
+                {reportData?.medicosPorConsultas.length} médicos • {reportData?.resumen.totalConsultas} consultas totales
+              </span>
+              <button 
+                onClick={handleExport}
+                className="flex items-center space-x-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+              >
+                <Download className="w-4 h-4" />
+                <span>Exportar</span>
+              </button>
+            </div>
           </div>
+          <p className="text-sm text-gray-500 mt-2">
+            Generado: {reportData?.resumen.fechaGeneracion} • 0 filtros activos
+          </p>
         </div>
 
-        <div className="divide-y divide-gray-200">
+        {showDoctorDetails && (
+          <div className="divide-y divide-gray-200">
           {reportData.medicosPorConsultas.length === 0 ? (
             <div className="px-6 py-8 text-center text-gray-500">
               No se encontraron consultas con los filtros aplicados
@@ -591,6 +622,7 @@ const ConsultationReports: React.FC = () => {
             ))
           )}
         </div>
+        )}
       </div>
     </div>
   );
