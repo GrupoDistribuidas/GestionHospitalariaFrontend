@@ -73,6 +73,7 @@ class AppointmentsService {
   }
 
   async fetchConsultaById(id: number) {
+    if (!id || id <= 0) throw new Error(`Consulta id inválido: ${id}`);
     const res = await safeFetch(`/consultas/${id}`, {
       method: "GET",
       headers: this.headers(),
@@ -87,6 +88,7 @@ class AppointmentsService {
   }
 
   async actualizarCita(id: number, payload: Partial<CreateAppointmentPayload>) {
+    if (!id || id <= 0) throw new Error(`Consulta id inválido: ${id}`);
     const bodyToSend: any = {
       fecha: payload.fecha,
       hora: payload.hora,
@@ -112,6 +114,7 @@ class AppointmentsService {
   }
 
   async eliminarCita(id: number) {
+    if (!id || id <= 0) throw new Error(`Consulta id inválido: ${id}`);
     const res = await safeFetch(`/consultas/${id}`, {
       method: "DELETE",
       headers: this.headers(),

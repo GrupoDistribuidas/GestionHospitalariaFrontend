@@ -39,6 +39,7 @@ type Consulta = {
 type ModalKind = "none" | "create" | "edit" | "delete";
 
 const AppointmentsWithModals: React.FC = () => {
+
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [consultas, setConsultas] = useState<Consulta[]>([]);
@@ -433,6 +434,7 @@ const AppointmentsWithModals: React.FC = () => {
 
       closeModal();
       await fetchConsultas();
+
     } catch (err: any) {
       console.error(err);
       setNotification({
