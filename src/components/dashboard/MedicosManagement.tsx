@@ -13,6 +13,7 @@ import {
   XCircle,
   Loader2,
 } from "lucide-react";
+import Alert from "../common/Alert";
 
 interface Medico {
   idEmpleado: number;
@@ -33,7 +34,8 @@ interface Especialidad {
   descripcion?: string;
 }
 
-const API_BASE = "http://localhost:5088/api";
+import { safeFetch, getAuthHeaders } from "../../services/apiClient";
+import { isAdmin } from "../../services/auth";
 
 const MedicosManagement: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -42,9 +44,15 @@ const MedicosManagement: React.FC = () => {
   );
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [especialidades, setEspecialidades] = useState<Especialidad[]>([]);
+  // Tipos de empleado fijos (según la tabla de la BD)
   const [tiposEmpleado, setTiposEmpleado] = useState<
     { idTipo: number; tipo: string }[]
-  >([]);
+  >([
+    { idTipo: 1, tipo: "Médico" },
+    { idTipo: 2, tipo: "Enfermero" },
+    { idTipo: 3, tipo: "Administrador" },
+    { idTipo: 4, tipo: "Recepcionista" },
+  ]);
   const [centrosMedicos, setCentrosMedicos] = useState<
     { idCentroMedico: number; nombre: string }[]
   >([]);
@@ -77,27 +85,89 @@ const MedicosManagement: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    if (!token) {
+    if (!localStorage.getItem("authToken")) {
       navigate("/login");
       return;
     }
     fetchData();
   }, []);
 
-  // Note: Assuming endpoints for tipos and centros exist or hardcode; for now, hardcode common values
+  // Cargar especialidades y medicos; derivar centros y tipos desde la lista de medicos
   useEffect(() => {
-    // Hardcode for demo; in real, fetch from API if available
-    setTiposEmpleado([
-      { idTipo: 1, tipo: "Médico" },
-      { idTipo: 2, tipo: "Enfermero" },
-      // add more
-    ]);
-    setCentrosMedicos([
-      { idCentroMedico: 1, nombre: "UC" },
-      { idCentroMedico: 2, nombre: "Cardiología" },
-      // add more based on image
-    ]);
+    const loadMeta = async () => {
+      try {
+        const headers = getAuthHeaders();
+        const [espRes, medRes] = await Promise.all([
+          safeFetch("/especialidades", { headers }),
+          safeFetch("/medicos", { headers }),
+        ]);
+
+        if (espRes.ok) {
+          const esp = await espRes.json();
+          setEspecialidades(
+            Array.isArray(esp) ? esp : esp.especialidades ?? []
+          );
+        } else {
+          setEspecialidades([]);
+        }
+
+        if (medRes.ok) {
+          const med = await medRes.json();
+          const medicosList = Array.isArray(med) ? med : med.medicos ?? [];
+          setMedicos(
+            medicosList.map((m: any) => ({
+              idEmpleado: m.idEmpleado,
+              idCentroMedico: m.idCentroMedico,
+              idTipo: m.idTipo,
+              idEspecialidad: m.idEspecialidad,
+              nombre: m.nombre,
+              telefono: m.telefono || "",
+              email: m.email || "",
+              salario: m.salario,
+              horario: m.horario,
+              estado: m.estado,
+            }))
+          );
+
+          // derivar centros únicos desde medicos (tiposEmpleado es fijo y no se deriva)
+          const centrosMap = new Map<
+            number,
+            { idCentroMedico: number; nombre: string }
+          >();
+          const tiposSet = new Set<number>();
+          medicosList.forEach((md: any) => {
+            if (
+              md.idCentroMedico != null &&
+              !centrosMap.has(md.idCentroMedico)
+            ) {
+              let nombre = `Centro ${md.idCentroMedico}`;
+              if (md.idCentroMedico === 1) nombre = "Hospital Central";
+              if (md.idCentroMedico === 2) nombre = "Clínica Norte";
+              if (md.idCentroMedico === 3) nombre = "Policlínico Sur";
+              centrosMap.set(md.idCentroMedico, {
+                idCentroMedico: md.idCentroMedico,
+                nombre,
+              });
+            }
+            if (md.idTipo != null) tiposSet.add(md.idTipo);
+          });
+
+          setCentrosMedicos(Array.from(centrosMap.values()));
+          // Nota: tiposEmpleado permanece con la lista fija definida arriba
+        } else {
+          setMedicos([]);
+          setCentrosMedicos([]);
+          setTiposEmpleado([]);
+        }
+      } catch (err) {
+        console.error("Error loadMeta medicos/especialidades:", err);
+        setEspecialidades([]);
+        setMedicos([]);
+        setCentrosMedicos([]);
+        setTiposEmpleado([]);
+      }
+    };
+    loadMeta();
   }, []);
 
   useEffect(() => {
@@ -119,15 +189,11 @@ const MedicosManagement: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     setError("");
-    const token = localStorage.getItem("authToken");
+
     try {
       const [medicosRes, especialidadesRes] = await Promise.all([
-        fetch(`${API_BASE}/medicos`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch(`${API_BASE}/especialidades`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        safeFetch("/medicos", { headers: getAuthHeaders() }),
+        safeFetch("/especialidades", { headers: getAuthHeaders() }),
       ]);
 
       if (!medicosRes.ok) {
@@ -172,14 +238,11 @@ const MedicosManagement: React.FC = () => {
 
   const handleCreateMedico = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem("authToken");
+
     try {
-      const res = await fetch(`${API_BASE}/medicos`, {
+      const res = await safeFetch("/medicos", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           idCentroMedico: parseInt(formData.idCentroMedico),
           idTipo: parseInt(formData.idTipo),
@@ -193,7 +256,6 @@ const MedicosManagement: React.FC = () => {
         }),
       });
       if (!res.ok) throw new Error("Error creating medico");
-      alert("Médico creado exitosamente");
       setNotification({
         message: "El médico ha sido creado exitosamente.",
         type: "success",
@@ -202,7 +264,6 @@ const MedicosManagement: React.FC = () => {
       setShowModal("none");
       setFormData({});
     } catch (err) {
-      alert("Error creando médico: " + (err instanceof Error ? err.message : "Error desconocido"));
       setNotification({
         message:
           "Error creando médico: " +
@@ -216,24 +277,17 @@ const MedicosManagement: React.FC = () => {
   const handleUpdateMedico = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMedico) return;
-    const token = localStorage.getItem("authToken");
+
     try {
-      const res = await fetch(
-        `${API_BASE}/medicos/${selectedMedico.idEmpleado}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            ...formData,
-            idEmpleado: selectedMedico.idEmpleado,
-          }),
-        }
-      );
+      const res = await safeFetch(`/medicos/${selectedMedico.idEmpleado}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          ...formData,
+          idEmpleado: selectedMedico.idEmpleado,
+        }),
+      });
       if (!res.ok) throw new Error("Error updating medico");
-      alert("Médico actualizado exitosamente");
       setNotification({
         message: "El médico ha sido actualizado exitosamente.",
         type: "success",
@@ -241,10 +295,6 @@ const MedicosManagement: React.FC = () => {
       fetchData();
       setShowModal("none");
     } catch (err) {
-      alert(
-        "Error actualizando médico: " +
-          (err instanceof Error ? err.message : "Error desconocido")
-      );
       setNotification({
         message:
           "Error actualizando médico: " +
@@ -257,28 +307,20 @@ const MedicosManagement: React.FC = () => {
 
   const handleDeleteMedico = async () => {
     if (!selectedMedico) return;
-    const token = localStorage.getItem("authToken");
+
     try {
-      const res = await fetch(
-        `${API_BASE}/medicos/${selectedMedico.idEmpleado}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await safeFetch(`/medicos/${selectedMedico.idEmpleado}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error("Error deleting medico");
-      alert("Médico eliminado exitosamente");
       setNotification({
-        message: "El médico ha sido eliminado exitosamente.",
+        message: "El médico ha sido eliminado correctamente.",
         type: "success",
       });
       fetchData();
       setShowModal("none");
     } catch (err) {
-      alert(
-        "Error eliminando médico: " +
-          (err instanceof Error ? err.message : "Error desconocido")
-      );
       setNotification({
         message:
           "Error eliminando médico: " +
@@ -292,21 +334,17 @@ const MedicosManagement: React.FC = () => {
   // Similar functions for Especialidades: handleCreateEspecialidad, handleUpdateEspecialidad, handleDeleteEspecialidad
   const handleCreateEspecialidad = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem("authToken");
+
     try {
-      const res = await fetch(`${API_BASE}/especialidades`, {
+      const res = await safeFetch("/especialidades", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           nombre: formData.nombre,
           descripcion: formData.descripcion,
         }),
       });
       if (!res.ok) throw new Error("Error creating especialidad");
-      alert("Especialidad creada exitosamente");
       setNotification({
         message: "La especialidad ha sido creada exitosamente.",
         type: "success",
@@ -315,10 +353,6 @@ const MedicosManagement: React.FC = () => {
       setShowModal("none");
       setFormData({});
     } catch (err) {
-      alert(
-        "Error creando especialidad: " +
-          (err instanceof Error ? err.message : "Error desconocido")
-      );
       setNotification({
         message:
           "Error creando especialidad: " +
@@ -332,16 +366,12 @@ const MedicosManagement: React.FC = () => {
   const handleUpdateEspecialidad = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEspecialidad) return;
-    const token = localStorage.getItem("authToken");
     try {
-      const res = await fetch(
-        `${API_BASE}/especialidades/${selectedEspecialidad.idEspecialidad}`,
+      const res = await safeFetch(
+        `/especialidades/${selectedEspecialidad.idEspecialidad}`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+          headers: getAuthHeaders(),
           body: JSON.stringify({
             ...formData,
             idEspecialidad: selectedEspecialidad.idEspecialidad,
@@ -349,7 +379,6 @@ const MedicosManagement: React.FC = () => {
         }
       );
       if (!res.ok) throw new Error("Error updating especialidad");
-      alert("Especialidad actualizada exitosamente");
       setNotification({
         message: "La especialidad ha sido actualizada exitosamente.",
         type: "success",
@@ -357,10 +386,6 @@ const MedicosManagement: React.FC = () => {
       fetchData();
       setShowModal("none");
     } catch (err) {
-      alert(
-        "Error actualizando especialidad: " +
-          (err instanceof Error ? err.message : "Error desconocido")
-      );
       setNotification({
         message:
           "Error actualizando especialidad: " +
@@ -373,17 +398,15 @@ const MedicosManagement: React.FC = () => {
 
   const handleDeleteEspecialidad = async () => {
     if (!selectedEspecialidad) return;
-    const token = localStorage.getItem("authToken");
     try {
-      const res = await fetch(
-        `${API_BASE}/especialidades/${selectedEspecialidad.idEspecialidad}`,
+      const res = await safeFetch(
+        `/especialidades/${selectedEspecialidad.idEspecialidad}`,
         {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAuthHeaders(),
         }
       );
       if (!res.ok) throw new Error("Error deleting especialidad");
-      alert("Especialidad eliminada exitosamente");
       setNotification({
         message: "La especialidad ha sido eliminada exitosamente.",
         type: "success",
@@ -391,10 +414,6 @@ const MedicosManagement: React.FC = () => {
       fetchData();
       setShowModal("none");
     } catch (err) {
-      alert(
-        "Error eliminando especialidad: " +
-          (err instanceof Error ? err.message : "Error desconocido")
-      );
       setNotification({
         message:
           "Error eliminando especialidad: " +
@@ -434,7 +453,13 @@ const MedicosManagement: React.FC = () => {
 
   const getCentroMedicoName = (id: number) => {
     const centro = centrosMedicos.find((c) => c.idCentroMedico === id);
-    return centro ? centro.nombre : `Centro ${id}`;
+    if (centro) return centro.nombre;
+    // Map known ids to readable names (from attachment)
+    if (id === 1) return "Hospital Central";
+    if (id === 2) return "Clínica Norte";
+    if (id === 3) return "Policlínico Sur";
+    if (id == null) return "N/D";
+    return `Centro ${id}`;
   };
 
   const StatusBadge = ({ estado }: { estado: string }) => (
@@ -475,7 +500,14 @@ const MedicosManagement: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 p-4">
+    <div className="p-6 space-y-6">
+      {notification && (
+        <Alert
+          type={notification.type === "success" ? "success" : "error"}
+          message={notification.message}
+          onClose={() => setNotification(null)}
+        />
+      )}
       {/* Header */}
       <div className="bg-[#035397] text-white rounded-2xl p-6 text-center shadow-xl">
         <h1 className="text-3xl font-bold mb-2">PERSONAL MÉDICO</h1>
@@ -483,25 +515,6 @@ const MedicosManagement: React.FC = () => {
           Gestión de personal médico y especialidades
         </p>
       </div>
-
-      {/* Notification */}
-      {notification && (
-        <div
-          className={`p-4 rounded-lg border ${
-            notification.type === "success"
-              ? "bg-green-100 text-green-800 border-green-300"
-              : "bg-red-100 text-red-800 border-red-300"
-          }`}
-        >
-          {notification.message}
-          <button
-            onClick={() => setNotification(null)}
-            className="float-right ml-4 text-lg"
-          >
-            &times;
-          </button>
-        </div>
-      )}
 
       {/* Search and Tabs */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -547,17 +560,20 @@ const MedicosManagement: React.FC = () => {
             Gestión Especialidades
           </button>
         </div>
-        <button
-          onClick={() =>
-            openModal(
-              activeTab === "personal" ? "createMedico" : "createEspecialidad"
-            )
-          }
-          className="flex items-center gap-2 bg-[#035397] text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Agregar {activeTab === "personal" ? "Médico" : "Especialidad"}
-        </button>
+        {/* Only admins can add medicos; keep especialidades creation available to everyone */}
+        {isAdmin() || activeTab !== "personal" ? (
+          <button
+            onClick={() =>
+              openModal(
+                activeTab === "personal" ? "createMedico" : "createEspecialidad"
+              )
+            }
+            className="flex items-center gap-2 bg-[#035397] text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Agregar {activeTab === "personal" ? "Médico" : "Especialidad"}
+          </button>
+        ) : null}
       </div>
 
       {/* Content */}
@@ -612,18 +628,22 @@ const MedicosManagement: React.FC = () => {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => openModal("editMedico", medico)}
-                        className="text-green-600 hover:text-green-900"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => openModal("deleteMedico", medico)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {isAdmin() && (
+                        <>
+                          <button
+                            onClick={() => openModal("editMedico", medico)}
+                            className="text-green-600 hover:text-green-900"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => openModal("deleteMedico", medico)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -663,18 +683,22 @@ const MedicosManagement: React.FC = () => {
                       >
                         <Eye className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => openModal("editEspecialidad", esp)}
-                        className="text-green-600 hover:text-green-900"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => openModal("deleteEspecialidad", esp)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      {isAdmin() && (
+                        <>
+                          <button
+                            onClick={() => openModal("editEspecialidad", esp)}
+                            className="text-green-600 hover:text-green-900"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => openModal("deleteEspecialidad", esp)}
+                            className="text-red-600 hover:text-red-900"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -690,7 +714,7 @@ const MedicosManagement: React.FC = () => {
       )}
 
       {/* Modals - Example for Medico Create/Edit; similar for others */}
-      {showModal === "createMedico" && (
+      {showModal === "createMedico" && isAdmin() && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
             <h2 className="text-xl font-bold mb-4">Crear Médico</h2>
@@ -743,24 +767,46 @@ const MedicosManagement: React.FC = () => {
                 className="w-full p-2 border rounded mb-2"
                 required
               />
-              <select
-                value={formData.idCentroMedico || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, idCentroMedico: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              >
-                <option value="">Seleccionar Centro Médico</option>
-                {centrosMedicos.map((centro) => (
-                  <option
-                    key={centro.idCentroMedico}
-                    value={centro.idCentroMedico}
-                  >
-                    {centro.nombre}
-                  </option>
-                ))}
-              </select>
+              {centrosMedicos.length > 0 ? (
+                <select
+                  value={formData.idCentroMedico || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, idCentroMedico: e.target.value })
+                  }
+                  className="w-full p-2 border rounded mb-2"
+                  required
+                >
+                  <option value="">Seleccionar Centro Médico</option>
+                  {centrosMedicos.map((centro) => (
+                    <option
+                      key={centro.idCentroMedico}
+                      value={centro.idCentroMedico}
+                    >
+                      {centro.nombre}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div>
+                  <input
+                    type="number"
+                    placeholder="Ingrese id de Centro Médico"
+                    value={formData.idCentroMedico || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        idCentroMedico: e.target.value,
+                      })
+                    }
+                    className="w-full p-2 border rounded mb-2"
+                    required
+                  />
+                  <p className="text-sm text-yellow-600 mt-1">
+                    No se encontraron centros desde la API. Introduzca
+                    manualmente el identificador numérico del centro.
+                  </p>
+                </div>
+              )}
               <select
                 value={formData.idTipo || ""}
                 onChange={(e) =>
@@ -876,24 +922,46 @@ const MedicosManagement: React.FC = () => {
                 className="w-full p-2 border rounded mb-2"
                 required
               />
-              <select
-                value={formData.idCentroMedico || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, idCentroMedico: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              >
-                <option value="">Seleccionar Centro Médico</option>
-                {centrosMedicos.map((centro) => (
-                  <option
-                    key={centro.idCentroMedico}
-                    value={centro.idCentroMedico}
-                  >
-                    {centro.nombre}
-                  </option>
-                ))}
-              </select>
+              {centrosMedicos.length > 0 ? (
+                <select
+                  value={formData.idCentroMedico || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, idCentroMedico: e.target.value })
+                  }
+                  className="w-full p-2 border rounded mb-2"
+                  required
+                >
+                  <option value="">Seleccionar Centro Médico</option>
+                  {centrosMedicos.map((centro) => (
+                    <option
+                      key={centro.idCentroMedico}
+                      value={centro.idCentroMedico}
+                    >
+                      {centro.nombre}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div>
+                  <input
+                    type="number"
+                    placeholder="Ingrese id de Centro Médico"
+                    value={formData.idCentroMedico || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        idCentroMedico: e.target.value,
+                      })
+                    }
+                    className="w-full p-2 border rounded mb-2"
+                    required
+                  />
+                  <p className="text-sm text-yellow-600 mt-1">
+                    No se encontraron centros desde la API. Introduzca
+                    manualmente el identificador numérico del centro.
+                  </p>
+                </div>
+              )}
               <select
                 value={formData.idTipo || ""}
                 onChange={(e) =>

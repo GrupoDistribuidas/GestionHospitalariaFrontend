@@ -12,6 +12,7 @@ import {
   ChevronRight,
   ChevronDown,
 } from "lucide-react";
+import { isAdmin } from "../../services/auth";
 
 interface SidebarProps {
   isMobileOpen?: boolean;
@@ -41,13 +42,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
 
   const baseWidth = isCollapsed ? "w-20" : "w-64";
   const sidebarClasses = [
-  `bg-[#2C3E50] text-white ${baseWidth} h-full z-50 transition-transform duration-300 ease-in-out`,
-  "border-r border-black/10 shadow-lg",
-  isMobileOpen
-    ? "fixed inset-y-0 left-0 transform translate-x-0 md:translate-x-0"
-    : "fixed inset-y-0 left-0 transform -translate-x-full md:translate-x-0",
-  "md:fixed md:left-0 md:translate-x-0",
-].join(" ");
+    `bg-[#2C3E50] text-white ${baseWidth} h-full z-50 transition-transform duration-300 ease-in-out`,
+    "border-r border-black/10 shadow-lg",
+    isMobileOpen
+      ? "fixed inset-y-0 left-0 transform translate-x-0 md:translate-x-0"
+      : "fixed inset-y-0 left-0 transform -translate-x-full md:translate-x-0",
+    "md:fixed md:left-0 md:translate-x-0",
+  ].join(" ");
 
   const Label: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     isCollapsed ? null : <span className="truncate">{children}</span>;
@@ -87,7 +88,9 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
       }`}
       title={isCollapsed ? title : undefined}
     >
-      <div className={`flex items-center ${isCollapsed ? "justify-center" : ""}`}>
+      <div
+        className={`flex items-center ${isCollapsed ? "justify-center" : ""}`}
+      >
         <div className="w-5 h-5 flex items-center justify-center">{icon}</div>
         <Label>
           <span className="ml-3">{title}</span>
@@ -170,11 +173,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
             <GroupHeader id="gestion" icon={<Stethoscope />} title="Gestión" />
             {!isCollapsed && openGroup.gestion && (
               <ul className="mt-2 space-y-2 pl-2">
-                <LinkItem
-                  to="/usuarios"
-                  icon={<Users className="w-5 h-5" />}
-                  label="Gestión de Usuarios"
-                />
+                {isAdmin() && (
+                  <LinkItem
+                    to="/usuarios"
+                    icon={<Users className="w-5 h-5" />}
+                    label="Gestión de Usuarios"
+                  />
+                )}
                 <LinkItem
                   to="/especialidades"
                   icon={<Stethoscope className="w-5 h-5" />}

@@ -1,6 +1,11 @@
 // src/components/dashboard/PacientesPage.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
+import {
+  ChevronsLeft,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsRight,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
   Search,
@@ -13,15 +18,15 @@ import {
   XCircle,
   User2,
   Phone,
-  Mail,
   MapPin,
   Shield,
   Calendar,
   Clock,
-  Paperclip,
   CreditCard,
-  Lock, CheckCircle2,
+  Lock,
+  CheckCircle2,
 } from "lucide-react";
+import Alert from "../common/Alert";
 interface Paciente {
   idPaciente: number;
   nombre: string;
@@ -58,7 +63,7 @@ interface ConsultaLite {
   estado?: "Programada" | "Completada" | "Cancelada";
 }
 
-const API_BASE = "http://localhost:5088/api";
+import { safeFetch, getAuthHeaders } from "../../services/apiClient";
 const mapPaciente = (raw: any): Paciente => ({
   idPaciente: raw.idPaciente ?? raw.id_paciente ?? raw.id ?? 0,
   nombre: raw.nombre,
@@ -71,7 +76,10 @@ const PacientesPage: React.FC = () => {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
-  const [toast, setToast] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [toast, setToast] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
   const [filtered, setFiltered] = useState<Paciente[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
@@ -95,10 +103,9 @@ const PacientesPage: React.FC = () => {
     if (pacientes.some((p) => p.cedula === cedNorm)) return true;
 
     try {
-      const token = localStorage.getItem("authToken");
-      const res = await fetch(
-        `${API_BASE}/pacientes?cedula=${encodeURIComponent(cedNorm)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      const res = await safeFetch(
+        `/pacientes?cedula=${encodeURIComponent(cedNorm)}`,
+        { headers: getAuthHeaders() }
       );
 
       if (!res.ok) return false;
@@ -127,7 +134,7 @@ const PacientesPage: React.FC = () => {
       navigate("/login");
       return;
     }
-    fetchData(); // 👈 solo al montar
+    fetchData(); // solo al montar
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const showToast = (type: "success" | "error", message: string) => {
@@ -142,7 +149,7 @@ const PacientesPage: React.FC = () => {
       return;
     }
     const exists = selectedPacienteId
-      ? pacientes.some(p => p.idPaciente === selectedPacienteId)
+      ? pacientes.some((p) => p.idPaciente === selectedPacienteId)
       : false;
 
     if (!selectedPacienteId || !exists) {
@@ -166,11 +173,9 @@ const PacientesPage: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     setError("");
-    const token = localStorage.getItem("authToken");
+
     try {
-      const res = await fetch(`${API_BASE}/pacientes`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await safeFetch("/pacientes", { headers: getAuthHeaders() });
       if (!res.ok) {
         if (res.status === 401) navigate("/login");
         throw new Error("Error fetching pacientes");
@@ -208,14 +213,14 @@ const PacientesPage: React.FC = () => {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem("authToken");
+
     const ced = (formData.cedula || "").trim();
     if (!ced) {
-      showToast("error", "Ingresa una cédula válida");
+      showToast("error", "Por favor ingresa una cédula válida.");
       return;
     }
     if (await checkCedulaExists(ced)) {
-      showToast("error", "Cédula ya registrada");
+      showToast("error", "La cédula ya está registrada en el sistema.");
       return;
     }
     try {
@@ -226,28 +231,28 @@ const PacientesPage: React.FC = () => {
         telefono: formData.telefono ?? "",
         direccion: formData.direccion ?? "",
       };
-      const res = await fetch(`${API_BASE}/pacientes`, {
+      const res = await safeFetch(`/pacientes`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(body),
       });
       if (!res.ok) {
         // Si el backend devuelve conflicto o un mensaje de duplicado
         const msg = await res.text().catch(() => "");
         if (res.status === 409 || /cedul|dni|duplic/i.test(msg)) {
-          showToast("error", "Cédula ya registrada");
+          showToast("error", "La cédula ya está registrada en el sistema.");
         } else {
-          showToast("error", "No se pudo crear el paciente");
+          showToast(
+            "error",
+            "No fue posible crear el paciente. Intenta nuevamente."
+          );
         }
         throw new Error("Error creando paciente");
       }
 
       await fetchData();
       closeModal();
-      showToast("success", "Paciente agregado con éxito 👍");
+      showToast("success", "Paciente creado correctamente.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error creando paciente");
     }
@@ -256,7 +261,6 @@ const PacientesPage: React.FC = () => {
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selected) return;
-    const token = localStorage.getItem("authToken");
     try {
       const body = {
         nombre: formData.nombre,
@@ -265,12 +269,9 @@ const PacientesPage: React.FC = () => {
         telefono: formData.telefono ?? "",
         direccion: formData.direccion ?? "",
       };
-      const res = await fetch(`${API_BASE}/pacientes/${selected.idPaciente}`, {
+      const res = await safeFetch(`/pacientes/${selected.idPaciente}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error("Error actualizando paciente");
@@ -305,6 +306,13 @@ const PacientesPage: React.FC = () => {
 
   return (
     <div className="space-y-6 p-4">
+      {toast && (
+        <Alert
+          type={toast.type === "success" ? "success" : "error"}
+          message={toast.message}
+          onClose={() => setToast(null)}
+        />
+      )}
       {/* Header */}
       <div className="bg-[#035397] text-white rounded-2xl p-6 text-center shadow-xl">
         <h1 className="text-3xl font-bold mb-2">GESTIÓN DE PACIENTES</h1>
@@ -328,7 +336,7 @@ const PacientesPage: React.FC = () => {
           className="flex items-center gap-2 bg-[#035397] text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Nuevo paciente
+          Registrar paciente
         </button>
       </div>
 
@@ -381,7 +389,9 @@ const PacientesPage: React.FC = () => {
                           "group cursor-pointer transition-colors",
                           "hover:bg-gray-50",
                           "border-l-4",
-                          isSelected ? "bg-blue-50/60 border-[#035397]" : "border-transparent",
+                          isSelected
+                            ? "bg-blue-50/60 border-[#035397]"
+                            : "border-transparent",
                         ].join(" ")}
                       >
                         <td className="px-6 py-3 whitespace-nowrap font-mono tabular-nums text-gray-900">
@@ -393,7 +403,9 @@ const PacientesPage: React.FC = () => {
                             <div className="h-8 w-8 rounded-full bg-gradient-to-br from-[#035397] to-blue-500 text-white grid place-items-center text-xs font-semibold shadow-sm">
                               {initials || "?"}
                             </div>
-                            <span className="font-medium text-gray-900">{p.nombre}</span>
+                            <span className="font-medium text-gray-900">
+                              {p.nombre}
+                            </span>
                           </div>
                         </td>
 
@@ -439,7 +451,10 @@ const PacientesPage: React.FC = () => {
 
                   {filtered.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-gray-500">
+                      <td
+                        colSpan={5}
+                        className="py-12 text-center text-gray-500"
+                      >
                         Sin resultados
                       </td>
                     </tr>
@@ -448,7 +463,8 @@ const PacientesPage: React.FC = () => {
               </table>
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-t">
                 <div className="text-sm text-gray-600">
-                  Mostrando {total ? start + 1 : 0}–{Math.min(end, total)} de {total}
+                  Mostrando {total ? start + 1 : 0}–{Math.min(end, total)} de{" "}
+                  {total}
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -464,8 +480,10 @@ const PacientesPage: React.FC = () => {
                       onChange={(e) => setPageSize(Number(e.target.value))}
                       className="border rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#035397]"
                     >
-                      {[5, 10, 20, 50].map(n => (
-                        <option key={n} value={n}>{n}</option>
+                      {[5, 10, 20, 50].map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
                       ))}
                     </select>
                   </label>
@@ -480,7 +498,7 @@ const PacientesPage: React.FC = () => {
                       <ChevronsLeft className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page === 1}
                       className="p-2 rounded-md border text-gray-600 hover:bg-gray-100 disabled:opacity-40"
                       title="Anterior"
@@ -489,11 +507,14 @@ const PacientesPage: React.FC = () => {
                     </button>
 
                     <span className="px-2 text-sm text-gray-700">
-                      Página <strong>{page}</strong> de <strong>{totalPages}</strong>
+                      Página <strong>{page}</strong> de{" "}
+                      <strong>{totalPages}</strong>
                     </span>
 
                     <button
-                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      onClick={() =>
+                        setPage((p) => Math.min(totalPages, p + 1))
+                      }
                       disabled={page === totalPages}
                       className="p-2 rounded-md border text-gray-600 hover:bg-gray-100 disabled:opacity-40"
                       title="Siguiente"
@@ -572,31 +593,29 @@ const PacientesPage: React.FC = () => {
           onClose={() => setToast(null)}
         />
       )}
-
     </div>
-
   );
 
   function handleDeleteConfirmFactory(id: number) {
     return async () => {
-      const token = localStorage.getItem("authToken");
       try {
-        const res = await fetch(`${API_BASE}/pacientes/${id}`, {
+        const res = await safeFetch(`/pacientes/${id}`, {
           method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getAuthHeaders(),
         });
         if (!res.ok) throw new Error("Error eliminando paciente");
 
-        setSelectedPacienteId(prev => (prev === id ? null : prev));
+        setSelectedPacienteId((prev) => (prev === id ? null : prev));
 
         await fetchData();
         closeModal();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Error eliminando paciente");
+        setError(
+          err instanceof Error ? err.message : "Error eliminando paciente"
+        );
       }
     };
   }
-
 };
 
 export default PacientesPage;
@@ -607,15 +626,27 @@ const Toast: React.FC<{
 }> = ({ type, message, onClose }) => {
   const styles =
     type === "success"
-      ? { ring: "ring-green-200", title: "text-green-700", icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> }
-      : { ring: "ring-red-200", title: "text-red-700", icon: <AlertCircle className="w-5 h-5 text-red-600" /> };
+      ? {
+          ring: "ring-green-200",
+          title: "text-green-700",
+          icon: <CheckCircle2 className="w-5 h-5 text-green-600" />,
+        }
+      : {
+          ring: "ring-red-200",
+          title: "text-red-700",
+          icon: <AlertCircle className="w-5 h-5 text-red-600" />,
+        };
 
   return (
     <div className="fixed top-20 right-6 z-[60]">
-      <div className={`flex items-start gap-3 rounded-xl bg-white px-4 py-3 shadow-2xl ring-1 ${styles.ring}`}>
+      <div
+        className={`flex items-start gap-3 rounded-xl bg-white px-4 py-3 shadow-2xl ring-1 ${styles.ring}`}
+      >
         <div className="mt-0.5">{styles.icon}</div>
         <div className="text-sm">
-          <div className={`font-semibold ${styles.title}`}>{type === "success" ? "Éxito" : "Error"}</div>
+          <div className={`font-semibold ${styles.title}`}>
+            {type === "success" ? "Éxito" : "Error"}
+          </div>
           <div className="text-gray-700">{message}</div>
         </div>
         <button
@@ -662,7 +693,8 @@ const PacienteForm: React.FC<{
   return (
     <form onSubmit={onSubmit}>
       <p className="text-xs text-gray-500 mb-3">
-        Los campos marcados con <span className="text-red-500">*</span> son obligatorios.
+        Los campos marcados con <span className="text-red-500">*</span> son
+        obligatorios.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -678,7 +710,9 @@ const PacienteForm: React.FC<{
             placeholder="Nombre y Apellido"
             autoComplete="name"
             value={formData.nombre || ""}
-            onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, nombre: e.target.value })
+            }
             className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#035397] placeholder:text-gray-400"
             required
           />
@@ -687,7 +721,10 @@ const PacienteForm: React.FC<{
         {/* Cédula (bloqueada en edición) */}
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between">
-            <label htmlFor="cedula" className="text-sm font-medium text-gray-700">
+            <label
+              htmlFor="cedula"
+              className="text-sm font-medium text-gray-700"
+            >
               Cédula <span className="text-red-500">*</span>
             </label>
             {isEdit && (
@@ -705,17 +742,23 @@ const PacienteForm: React.FC<{
             pattern="\d{10}"
             title="10 dígitos"
             value={formData.cedula || ""}
-            onChange={(e) => setFormData({ ...formData, cedula: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, cedula: e.target.value })
+            }
             disabled={isEdit}
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#035397] placeholder:text-gray-400 ${isEdit ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""
-              }`}
+            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#035397] placeholder:text-gray-400 ${
+              isEdit ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""
+            }`}
             required
           />
         </div>
 
         {/* Fecha de nacimiento */}
         <div className="flex flex-col gap-1">
-          <label htmlFor="fechaNacimiento" className="text-sm font-medium text-gray-700">
+          <label
+            htmlFor="fechaNacimiento"
+            className="text-sm font-medium text-gray-700"
+          >
             Fecha de nacimiento <span className="text-red-500">*</span>
           </label>
           <input
@@ -737,7 +780,10 @@ const PacienteForm: React.FC<{
 
         {/* Teléfono */}
         <div className="flex flex-col gap-1">
-          <label htmlFor="telefono" className="text-sm font-medium text-gray-700">
+          <label
+            htmlFor="telefono"
+            className="text-sm font-medium text-gray-700"
+          >
             Teléfono
           </label>
           <input
@@ -747,14 +793,19 @@ const PacienteForm: React.FC<{
             placeholder="Ingrese su telefono"
             inputMode="tel"
             value={formData.telefono || ""}
-            onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, telefono: e.target.value })
+            }
             className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#035397] placeholder:text-gray-400"
           />
         </div>
 
         {/* Dirección */}
         <div className="flex flex-col gap-1 md:col-span-2">
-          <label htmlFor="direccion" className="text-sm font-medium text-gray-700">
+          <label
+            htmlFor="direccion"
+            className="text-sm font-medium text-gray-700"
+          >
             Dirección
           </label>
           <input
@@ -764,7 +815,9 @@ const PacienteForm: React.FC<{
             placeholder="Ej. Av. Siempre Viva 742, Ambato"
             autoComplete="street-address"
             value={formData.direccion || ""}
-            onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
+            onChange={(e) =>
+              setFormData({ ...formData, direccion: e.target.value })
+            }
             className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#035397] placeholder:text-gray-400"
           />
         </div>
@@ -1017,10 +1070,7 @@ const PatientSidebar: React.FC<{
   const [error, setError] = useState<string>("");
   const [paciente, setPaciente] = useState<PacienteDetalle | null>(null);
   const [consultas, setConsultas] = useState<ConsultaLite[]>([]);
-  const [nota, setNota] = useState<string>("");
-  const [guardando, setGuardando] = useState(false);
-
-  const token = useMemo(() => localStorage.getItem("authToken"), []);
+  // removed unused nota state
 
   useEffect(() => {
     if (!pacienteId) {
@@ -1032,8 +1082,8 @@ const PatientSidebar: React.FC<{
       setLoading(true);
       setError("");
       try {
-        const resP = await fetch(`${API_BASE}/pacientes/${pacienteId}`, {
-          headers: { Authorization: `Bearer ${token}` },
+        const resP = await safeFetch(`/pacientes/${pacienteId}`, {
+          headers: getAuthHeaders(),
         });
 
         // Si el paciente fue eliminado o no existe:
@@ -1063,11 +1113,12 @@ const PatientSidebar: React.FC<{
         };
         setPaciente(detalle);
 
-        const urlConsultas = `${API_BASE}/consultas${detalle.idPaciente ? `?pacienteId=${detalle.idPaciente}` : ""
-          }`;
-        const resC = await fetch(urlConsultas, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const resC = await safeFetch(
+          `/consultas${
+            detalle.idPaciente ? `?pacienteId=${detalle.idPaciente}` : ""
+          }`,
+          { headers: getAuthHeaders() }
+        );
 
         if (!resC.ok) {
           // Si falla el historial, no rompas la UI: deja vacío y muestra un mensaje suave
@@ -1100,10 +1151,10 @@ const PatientSidebar: React.FC<{
       }
     };
     fetchAll();
-  }, [pacienteId, token]);
+  }, [pacienteId]);
 
   const now = new Date();
-  const { proximas, historial } = useMemo(() => {
+  const { historial } = useMemo(() => {
     const toDate = (c: ConsultaLite) => {
       try {
         const base = c.fecha ? new Date(c.fecha) : new Date();
@@ -1116,16 +1167,11 @@ const PatientSidebar: React.FC<{
         return new Date();
       }
     };
-    const ord = (a: ConsultaLite, b: ConsultaLite) => +toDate(a) - +toDate(b);
-    const future = consultas
-      .filter((c) => +toDate(c) >= +now)
-      .sort(ord)
-      .slice(0, 2);
     const past = consultas
       .filter((c) => +toDate(c) < +now)
       .sort((a, b) => +toDate(b) - +toDate(a))
       .slice(0, 2);
-    return { proximas: future, historial: past };
+    return { historial: past };
   }, [consultas]);
 
   const initials = useMemo(() => {
@@ -1166,8 +1212,10 @@ const PatientSidebar: React.FC<{
   if (!paciente) return null;
   // Estilo del pill según estado de la consulta
   const pillClass = (s?: string) => {
-    if (s === "Completada") return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
-    if (s === "Cancelada") return "bg-rose-50 text-rose-700 ring-1 ring-rose-200";
+    if (s === "Completada")
+      return "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200";
+    if (s === "Cancelada")
+      return "bg-rose-50 text-rose-700 ring-1 ring-rose-200";
     return "bg-blue-50 text-blue-700 ring-1 ring-blue-200"; // Programada / Próxima
   };
 
@@ -1188,7 +1236,9 @@ const PatientSidebar: React.FC<{
               />
             ) : (
               <div className="-mt-8 w-16 h-16 rounded-full bg-white ring-4 ring-white shadow-lg flex items-center justify-center">
-                <span className="text-[#035397] font-semibold text-lg">{initials}</span>
+                <span className="text-[#035397] font-semibold text-lg">
+                  {initials}
+                </span>
               </div>
             )}
 
@@ -1206,7 +1256,9 @@ const PatientSidebar: React.FC<{
                 <span className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-0.5 text-xs text-gray-800 ring-1 ring-gray-200">
                   <CreditCard className="w-3.5 h-3.5 text-gray-600" />
                   <span className="font-medium">DNI:</span>
-                  <span className="font-semibold tracking-wide tabular-nums">{paciente.cedula}</span>
+                  <span className="font-semibold tracking-wide tabular-nums">
+                    {paciente.cedula}
+                  </span>
                 </span>
 
                 {paciente.seguro && (
@@ -1224,13 +1276,17 @@ const PatientSidebar: React.FC<{
       <div className="p-5 space-y-6">
         {/* Información de contacto */}
         <section>
-          <h4 className="text-sm font-semibold text-gray-800">Información de Contacto</h4>
+          <h4 className="text-sm font-semibold text-gray-800">
+            Información de Contacto
+          </h4>
           <div className="mt-3 grid grid-cols-1 gap-3">
             <div className="flex items-center justify-between gap-3 rounded-xl border bg-white px-3 py-2.5 hover:bg-gray-50 transition">
               <span className="flex items-center gap-2 text-gray-600">
                 <Phone className="w-4 h-4" /> Teléfono
               </span>
-              <span className="font-medium text-gray-900">{paciente.telefono ?? "—"}</span>
+              <span className="font-medium text-gray-900">
+                {paciente.telefono ?? "—"}
+              </span>
             </div>
 
             <div className="flex items-center justify-between gap-3 rounded-xl border bg-white px-3 py-2.5 hover:bg-gray-50 transition">
@@ -1245,7 +1301,9 @@ const PatientSidebar: React.FC<{
         </section>
         {/* Historial reciente */}
         <section>
-          <h4 className="text-sm font-semibold text-gray-800">Historial Reciente</h4>
+          <h4 className="text-sm font-semibold text-gray-800">
+            Historial Reciente
+          </h4>
           {historial.length === 0 ? (
             <div className="mt-3 text-sm text-gray-500 rounded-xl border bg-white px-3 py-3">
               Sin registros.
@@ -1256,7 +1314,9 @@ const PatientSidebar: React.FC<{
                 const fecha = new Date(c.fecha);
                 const fechaStr = fecha.toLocaleDateString();
                 const hora = c.hora ? `• ${c.hora}` : "";
-                const doctor = c.nombreMedico ? `• Dr./Dra. ${c.nombreMedico}` : "";
+                const doctor = c.nombreMedico
+                  ? `• Dr./Dra. ${c.nombreMedico}`
+                  : "";
                 return (
                   <div
                     key={c.idConsulta}
@@ -1266,12 +1326,19 @@ const PatientSidebar: React.FC<{
                       <Clock className="w-4 h-4 text-gray-700" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="text-sm font-medium text-gray-900">{c.motivo || "Consulta"}</div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {c.motivo || "Consulta"}
+                      </div>
                       <div className="text-xs text-gray-500">
-                        {fechaStr} {hora} <span className="hidden sm:inline">{doctor}</span>
+                        {fechaStr} {hora}{" "}
+                        <span className="hidden sm:inline">{doctor}</span>
                       </div>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] ${pillClass(c.estado)}`}>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[11px] ${pillClass(
+                        c.estado
+                      )}`}
+                    >
                       {c.estado ?? "Completada"}
                     </span>
                   </div>

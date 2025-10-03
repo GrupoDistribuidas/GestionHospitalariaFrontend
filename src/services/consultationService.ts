@@ -1,21 +1,17 @@
-﻿import type { 
-  ReporteConsultas, 
-  FilterFormData, 
-  ExportOptions, 
+﻿import type {
+  ReporteConsultas,
+  FilterFormData,
+  ExportOptions,
   Medico,
   StatisticsData,
-  ConsultationsByDoctor
-} from '../types/consultation';
+  ConsultationsByDoctor,
+} from "../types/consultation";
 
-const API_BASE_URL = 'http://localhost:5088/api';
+import { getAuthHeaders, safeFetch } from "./apiClient";
 
 export class ConsultationService {
   private getAuthHeaders(): HeadersInit {
-    const token = localStorage.getItem('authToken');
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    };
+    return getAuthHeaders("application/json");
   }
 
   /**
@@ -24,22 +20,26 @@ export class ConsultationService {
    */
   async fetchMedicosDisponibles(): Promise<Medico[]> {
     try {
-      const response = await fetch(`${API_BASE_URL}/reportes/medicos-disponibles`, {
-        method: 'GET',
-        headers: this.getAuthHeaders()
+      const response = await safeFetch(`/reportes/medicos-disponibles`, {
+        method: "GET",
+        headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error('Session expired. Please login again.');
+          throw new Error("Session expired. Please login again.");
         }
-        throw new Error(`Error fetching doctors: ${response.status}`);
+        const txt = await response.text().catch(() => "");
+        throw new Error(`Error fetching doctors: ${response.status} ${txt}`);
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Error fetching doctors:', error);
-      throw new Error('No se pudo consultar la lista de médicos. Verifique que el servidor esté disponible.');
+      console.error("Error fetching doctors:", error);
+      // Try to extract message from error object
+      const message =
+        (error as any)?.message ?? "No se pudo consultar la lista de médicos.";
+      throw new Error(`${message} Verifique que el servidor esté disponible.`);
     }
   }
 
@@ -48,25 +48,33 @@ export class ConsultationService {
    * @param filters - Filtros opcionales para las consultas
    * @returns Promise<ReporteConsultas>
    */
-  async fetchConsultationReports(filters: FilterFormData = {}): Promise<ReporteConsultas> {
+  async fetchConsultationReports(
+    filters: FilterFormData = {}
+  ): Promise<ReporteConsultas> {
     try {
-      const response = await fetch(`${API_BASE_URL}/reportes/consultas-por-medico`, {
-        method: 'POST',
+      const response = await safeFetch(`/reportes/consultas-por-medico`, {
+        method: "POST",
         headers: this.getAuthHeaders(),
-        body: JSON.stringify(filters)
+        body: JSON.stringify(filters),
       });
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error('Session expired. Please login again.');
+          throw new Error("Session expired. Please login again.");
         }
-        throw new Error(`Error fetching consultation reports: ${response.status}`);
+        const txt = await response.text().catch(() => "");
+        throw new Error(
+          `Error fetching consultation reports: ${response.status} ${txt}`
+        );
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Error fetching consultation reports:', error);
-      throw new Error('No se pudo consultar los reportes de consultas. Verifique que el servidor esté disponible.');
+      console.error("Error fetching consultation reports:", error);
+      const message =
+        (error as any)?.message ??
+        "No se pudo consultar los reportes de consultas.";
+      throw new Error(`${message} Verifique que el servidor esté disponible.`);
     }
   }
 
@@ -75,39 +83,58 @@ export class ConsultationService {
    * @param filters - Filtros opcionales para las estadísticas
    * @returns Promise<StatisticsData>
    */
-  async fetchEstadisticasConsultas(filters: FilterFormData = {}): Promise<StatisticsData> {
+  async fetchEstadisticasConsultas(
+    filters: FilterFormData = {}
+  ): Promise<StatisticsData> {
     try {
-      const response = await fetch(`${API_BASE_URL}/reportes/estadisticas-consultas`, {
-        method: 'POST',
+      const response = await safeFetch(`/reportes/estadisticas-consultas`, {
+        method: "POST",
         headers: this.getAuthHeaders(),
-        body: JSON.stringify(filters)
+        body: JSON.stringify(filters),
       });
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error('Session expired. Please login again.');
+          throw new Error("Session expired. Please login again.");
         }
-        throw new Error(`Error fetching statistics: ${response.status}`);
+        const txt = await response.text().catch(() => "");
+        throw new Error(`Error fetching statistics: ${response.status} ${txt}`);
       }
 
       const data = await response.json();
-      
+
       // Debug: Mostrar los datos de especialidades que llegan de la API
-      console.log('📊 Datos de estadísticas recibidos de la API:', data);
-      console.log('🏥 Especialidades específicamente:', data.especialidades);
-      
+      console.log("📊 Datos de estadísticas recibidos de la API:", data);
+      console.log("🏥 Especialidades específicamente:", data.especialidades);
+
       // Validar y limpiar datos de especialidades
       if (data.especialidades && Array.isArray(data.especialidades)) {
         data.especialidades = data.especialidades.map((esp: any) => ({
           ...esp,
-          nombreEspecialidad: esp.nombreEspecialidad || `Especialidad ${esp.idEspecialidad}` || 'Especialidad Desconocida'
+          nombreEspecialidad:
+            esp.nombreEspecialidad ||
+            `Especialidad ${esp.idEspecialidad}` ||
+            "Especialidad Desconocida",
         }));
       }
-      
+
       return data;
     } catch (error) {
-      console.error('Error fetching statistics:', error);
-      throw new Error('No se pudo consultar las estadísticas. Verifique que el servidor esté disponible.');
+      console.error("Error fetching statistics:", error);
+      const message =
+        (error as any)?.message ?? "No se pudo consultar las estadísticas.";
+      // If the server returned a Response-like error with body text, attempt to include it
+      if (error instanceof Error && (error as any).response) {
+        try {
+          const resp = (error as any).response as Response;
+          const text = await resp.text();
+          throw new Error(`${message} Detalle del servidor: ${text}`);
+        } catch (e) {
+          // Fall through
+        }
+      }
+
+      throw new Error(`${message} Verifique que el servidor esté disponible.`);
     }
   }
 
@@ -117,36 +144,47 @@ export class ConsultationService {
    * @param medicosDisponibles - Lista de médicos con sus especialidades
    * @returns StatisticsData con nombres de especialidades corregidos
    */
-  enrichStatisticsWithSpecialtyNames(statisticsData: StatisticsData, medicosDisponibles: Medico[]): StatisticsData {
+  enrichStatisticsWithSpecialtyNames(
+    statisticsData: StatisticsData,
+    medicosDisponibles: Medico[]
+  ): StatisticsData {
     // Crear un mapa de especialidades únicas desde los médicos
     const especialidadesMap = new Map<string, string>();
-    medicosDisponibles.forEach(medico => {
+    medicosDisponibles.forEach((medico) => {
       if (medico.especialidad && medico.especialidad.trim()) {
-        especialidadesMap.set(medico.especialidad.toLowerCase(), medico.especialidad);
+        especialidadesMap.set(
+          medico.especialidad.toLowerCase(),
+          medico.especialidad
+        );
       }
     });
 
     // Crear un array de especialidades basado en los médicos disponibles
-    const especialidadesPorMedicos = Array.from(especialidadesMap.entries()).map(([key, nombreEspecialidad], index) => {
+    const especialidadesPorMedicos = Array.from(
+      especialidadesMap.entries()
+    ).map(([key, nombreEspecialidad], index) => {
       // Buscar si hay estadísticas para esta especialidad
-      const statsEspecialidad = statisticsData.especialidades.find(esp => 
-        esp.nombreEspecialidad?.toLowerCase().includes(key) || 
-        esp.idEspecialidad === index + 1
+      const statsEspecialidad = statisticsData.especialidades.find(
+        (esp) =>
+          esp.nombreEspecialidad?.toLowerCase().includes(key) ||
+          esp.idEspecialidad === index + 1
       );
 
       return {
         idEspecialidad: index + 1,
         nombreEspecialidad: nombreEspecialidad,
-        totalMedicos: medicosDisponibles.filter(m => m.especialidad.toLowerCase() === key).length,
-        totalConsultas: statsEspecialidad?.totalConsultas || 0
+        totalMedicos: medicosDisponibles.filter(
+          (m) => m.especialidad.toLowerCase() === key
+        ).length,
+        totalConsultas: statsEspecialidad?.totalConsultas || 0,
       };
     });
 
-    console.log('🔄 Especialidades enriquecidas:', especialidadesPorMedicos);
+    console.log("🔄 Especialidades enriquecidas:", especialidadesPorMedicos);
 
     return {
       ...statisticsData,
-      especialidades: especialidadesPorMedicos
+      especialidades: especialidadesPorMedicos,
     };
   }
 
@@ -155,11 +193,13 @@ export class ConsultationService {
    * @param reportData - Datos del reporte de consultas
    * @returns ConsultationsByDoctor[]
    */
-  transformDataForCharts(reportData: ReporteConsultas): ConsultationsByDoctor[] {
-    return reportData.medicosPorConsultas.map(medico => ({
+  transformDataForCharts(
+    reportData: ReporteConsultas
+  ): ConsultationsByDoctor[] {
+    return reportData.medicosPorConsultas.map((medico) => ({
       nombreMedico: medico.nombreMedico,
       totalConsultas: medico.totalConsultas,
-      especialidad: medico.especialidad
+      especialidad: medico.especialidad,
     }));
   }
 
@@ -171,41 +211,51 @@ export class ConsultationService {
    * @returns StatisticsData con nombres de especialidades corregidos
    */
   enrichStatisticsWithRealSpecialtyNames(
-    statisticsData: StatisticsData, 
+    statisticsData: StatisticsData,
     medicosData: Medico[]
   ): StatisticsData {
     // Crear un mapa de especialidades únicas desde los médicos
     const especialidadesReales = new Map<string, string>();
-    
-    medicosData.forEach(medico => {
-      if (medico.especialidad && !especialidadesReales.has(medico.especialidad)) {
+
+    medicosData.forEach((medico) => {
+      if (
+        medico.especialidad &&
+        !especialidadesReales.has(medico.especialidad)
+      ) {
         especialidadesReales.set(medico.especialidad, medico.especialidad);
       }
     });
 
     // Enriquecer las especialidades en statisticsData
-    const especialidadesEnriquecidas = statisticsData.especialidades.map(esp => {
-      // Si el nombreEspecialidad parece ser un ID (contiene "ID:" o es solo números)
-      if (esp.nombreEspecialidad.includes('ID:') || /^especialidad\s*id\s*:\s*\d+$/i.test(esp.nombreEspecialidad)) {
-        // Intentar encontrar una especialidad real correspondiente
-        const especialidadesArray = Array.from(especialidadesReales.keys());
-        
-        // Si tenemos especialidades disponibles, usar la que corresponda al índice
-        if (especialidadesArray.length > 0) {
-          const index = (esp.idEspecialidad - 1) % especialidadesArray.length;
-          return {
-            ...esp,
-            nombreEspecialidad: especialidadesArray[index] || `Especialidad ${esp.idEspecialidad}`
-          };
+    const especialidadesEnriquecidas = statisticsData.especialidades.map(
+      (esp) => {
+        // Si el nombreEspecialidad parece ser un ID (contiene "ID:" o es solo números)
+        if (
+          esp.nombreEspecialidad.includes("ID:") ||
+          /^especialidad\s*id\s*:\s*\d+$/i.test(esp.nombreEspecialidad)
+        ) {
+          // Intentar encontrar una especialidad real correspondiente
+          const especialidadesArray = Array.from(especialidadesReales.keys());
+
+          // Si tenemos especialidades disponibles, usar la que corresponda al índice
+          if (especialidadesArray.length > 0) {
+            const index = (esp.idEspecialidad - 1) % especialidadesArray.length;
+            return {
+              ...esp,
+              nombreEspecialidad:
+                especialidadesArray[index] ||
+                `Especialidad ${esp.idEspecialidad}`,
+            };
+          }
         }
+
+        return esp;
       }
-      
-      return esp;
-    });
+    );
 
     return {
       ...statisticsData,
-      especialidades: especialidadesEnriquecidas
+      especialidades: especialidadesEnriquecidas,
     };
   }
 
@@ -216,28 +266,30 @@ export class ConsultationService {
    * @returns ReporteConsultas con especialidades corregidas
    */
   enrichReportWithRealSpecialtyNames(
-    reportData: ReporteConsultas, 
+    reportData: ReporteConsultas,
     medicosData: Medico[]
   ): ReporteConsultas {
     // Crear mapa de médicos por ID para lookup rápido
     const medicosMap = new Map<number, Medico>();
-    medicosData.forEach(medico => {
+    medicosData.forEach((medico) => {
       medicosMap.set(medico.idMedico, medico);
     });
 
     // Enriquecer los datos de médicos en el reporte
-    const medicosPorConsultasEnriquecidos = reportData.medicosPorConsultas.map(medico => {
-      const medicoCompleto = medicosMap.get(medico.idMedico);
-      
-      return {
-        ...medico,
-        especialidad: medicoCompleto?.especialidad || medico.especialidad
-      };
-    });
+    const medicosPorConsultasEnriquecidos = reportData.medicosPorConsultas.map(
+      (medico) => {
+        const medicoCompleto = medicosMap.get(medico.idMedico);
+
+        return {
+          ...medico,
+          especialidad: medicoCompleto?.especialidad || medico.especialidad,
+        };
+      }
+    );
 
     return {
       ...reportData,
-      medicosPorConsultas: medicosPorConsultasEnriquecidos
+      medicosPorConsultas: medicosPorConsultasEnriquecidos,
     };
   }
 
@@ -248,23 +300,25 @@ export class ConsultationService {
    */
   async exportConsultationData(options: ExportOptions): Promise<Blob> {
     try {
-      const response = await fetch(`${API_BASE_URL}/reportes/export`, {
-        method: 'POST',
+      const response = await safeFetch(`/reportes/export`, {
+        method: "POST",
         headers: this.getAuthHeaders(),
-        body: JSON.stringify(options)
+        body: JSON.stringify(options),
       });
 
       if (!response.ok) {
         if (response.status === 401) {
-          throw new Error('Session expired. Please login again.');
+          throw new Error("Session expired. Please login again.");
         }
         throw new Error(`Error exporting data: ${response.status}`);
       }
 
       return await response.blob();
     } catch (error) {
-      console.error('Error exporting data:', error);
-      throw new Error('No se pudo exportar los datos. Verifique que el servidor esté disponible.');
+      console.error("Error exporting data:", error);
+      throw new Error(
+        "No se pudo exportar los datos. Verifique que el servidor esté disponible."
+      );
     }
   }
 
@@ -276,10 +330,10 @@ export class ConsultationService {
    */
   validateDateRange(startDate: string, endDate: string): boolean {
     if (!startDate || !endDate) return true;
-    
+
     const start = new Date(startDate);
     const end = new Date(endDate);
-    
+
     return start <= end;
   }
 
@@ -290,13 +344,13 @@ export class ConsultationService {
    */
   private buildQueryParams(filters: FilterFormData): string {
     const params = new URLSearchParams();
-    
+
     Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
+      if (value !== undefined && value !== null && value !== "") {
         params.append(key, value.toString());
       }
     });
-    
+
     return params.toString();
   }
 
@@ -307,14 +361,14 @@ export class ConsultationService {
    */
   private getAcceptHeader(format: string): string {
     switch (format) {
-      case 'csv':
-        return 'text/csv';
-      case 'excel':
-        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      case 'pdf':
-        return 'application/pdf';
+      case "csv":
+        return "text/csv";
+      case "excel":
+        return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+      case "pdf":
+        return "application/pdf";
       default:
-        return 'application/octet-stream';
+        return "application/octet-stream";
     }
   }
 }
