@@ -50,8 +50,9 @@ const MedicosManagement: React.FC = () => {
   >([
     { idTipo: 1, tipo: "Médico" },
     { idTipo: 2, tipo: "Enfermero" },
-    { idTipo: 3, tipo: "Administrador" },
-    { idTipo: 4, tipo: "Recepcionista" },
+    { idTipo: 3, tipo: "Recepcionista" },
+    { idTipo: 4, tipo: "Técnico en Sistemas" },
+    { idTipo: 5, tipo: "Técnico de Laboratorio" },
   ]);
   const [centrosMedicos, setCentrosMedicos] = useState<
     { idCentroMedico: number; nombre: string }[]

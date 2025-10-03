@@ -62,9 +62,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
       <Link
         to={to}
         onClick={() => handleLinkClick(to)}
-        className={`flex items-center p-2 rounded transition-colors duration-200 ${
-          isActive(to) ? "bg-[#035397] text-white" : "hover:bg-gray-800"
-        } ${isCollapsed ? "justify-center" : ""}`}
+        className={`flex items-center p-2 rounded transition-colors duration-200 ${isActive(to) ? "bg-[#035397] text-white" : "hover:bg-gray-800"
+          } ${isCollapsed ? "justify-center" : ""}`}
         title={isCollapsed ? label : undefined}
       >
         <span className="w-5 h-5 mr-0 md:mr-3 flex items-center justify-center">
@@ -83,9 +82,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
     <button
       type="button"
       onClick={() => toggleGroup(id)}
-      className={`w-full flex items-center gap-3 text-xs uppercase tracking-wide text-gray-300/90 ${
-        isCollapsed ? "justify-center" : "justify-between"
-      }`}
+      className={`w-full flex items-center gap-3 text-xs uppercase tracking-wide text-gray-300/90 ${isCollapsed ? "justify-center" : "justify-between"
+        }`}
       title={isCollapsed ? title : undefined}
     >
       <div
@@ -98,9 +96,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
       </div>
       {!isCollapsed && (
         <ChevronDown
-          className={`w-4 h-4 transition-transform ${
-            openGroup[id] ? "rotate-0" : "-rotate-90"
-          }`}
+          className={`w-4 h-4 transition-transform ${openGroup[id] ? "rotate-0" : "-rotate-90"
+            }`}
         />
       )}
     </button>
@@ -120,9 +117,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
         {/* Header / botón colapsar */}
         <div className="p-4 border-b border-white/10 flex items-center justify-between">
           <div
-            className={`font-semibold ${
-              isCollapsed ? "text-base text-center w-full" : "text-lg"
-            }`}
+            className={`font-semibold ${isCollapsed ? "text-base text-center w-full" : "text-lg"
+              }`}
           >
             {isCollapsed ? "GH" : "Gestión Hospitalaria"}
           </div>
@@ -154,11 +150,13 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
             <GroupHeader id="perfil" icon={<User />} title="Perfil" />
             {!isCollapsed && openGroup.perfil && (
               <ul className="mt-2 space-y-2 pl-2">
-                <LinkItem
-                  to="/perfil"
-                  icon={<User className="w-5 h-5" />}
-                  label="Personal Médico"
-                />
+                {isAdmin() && (
+                  <LinkItem
+                    to="/perfil"
+                    icon={<User className="w-5 h-5" />}
+                    label="Personal Médico"
+                  />
+                )}
                 <LinkItem
                   to="/mi-perfil"
                   icon={<User className="w-5 h-5" />}
@@ -180,34 +178,45 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
                     label="Gestión de Usuarios"
                   />
                 )}
-                <LinkItem
-                  to="/especialidades"
-                  icon={<Stethoscope className="w-5 h-5" />}
-                  label="Gestión de Especialidades"
-                />
+                {isAdmin() && (
+                  <LinkItem
+                    to="/especialidades"
+                    icon={<Stethoscope className="w-5 h-5" />}
+                    label="Gestión de Especialidades"
+                  />
+                )}
                 <LinkItem
                   to="/pacientes"
                   icon={<HeartPulse className="w-5 h-5" />}
                   label="Gestión de Pacientes"
                 />
+                {!isAdmin() && (
+                  <LinkItem
+                    to="/agenda"
+                    icon={<FileText className="w-5 h-5" />}
+                    label="Gestión de Citas"
+                  />
+                )}
               </ul>
             )}
           </div>
 
           {/* REPORTES */}
-          <div className="mt-4">
-            <GroupHeader id="reportes" icon={<FileText />} title="Reportes" />
-            {!isCollapsed && openGroup.reportes && (
-              <ul className="mt-2 space-y-2 pl-2">
-                <LinkItem
-                  to="/reportes"
-                  icon={<FileText className="w-5 h-5" />}
-                  label="Reportes de Consultas"
-                />
-              </ul>
-            )}
-          </div>
+          {isAdmin() && (
+            <div className="mt-4">
+              <GroupHeader id="reportes" icon={<FileText />} title="Reportes" />
+              {!isCollapsed && openGroup.reportes && (
+                <ul className="mt-2 space-y-2 pl-2">
 
+                  <LinkItem
+                    to="/reportes"
+                    icon={<FileText className="w-5 h-5" />}
+                    label="Reportes de Consultas"
+                  />
+                </ul>
+              )}
+            </div>
+          )}
           {/* Logout */}
           <div className="mt-auto pt-4 border-t border-white/10">
             <ul>
@@ -215,9 +224,8 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
                 <Link
                   to="/login"
                   onClick={() => handleLinkClick("/login")}
-                  className={`flex items-center p-2 rounded transition-colors duration-200 hover:bg-gray-800 ${
-                    isCollapsed ? "justify-center" : ""
-                  }`}
+                  className={`flex items-center p-2 rounded transition-colors duration-200 hover:bg-gray-800 ${isCollapsed ? "justify-center" : ""
+                    }`}
                   title={isCollapsed ? "Cerrar Sesión" : undefined}
                 >
                   <span className="w-5 h-5 mr-0 md:mr-3 flex items-center justify-center">
