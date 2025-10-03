@@ -10,6 +10,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import logo from "../../assets/logo.png";
+import { safeFetch } from "../../services/apiClient";
 
 const LoginScreen = () => {
   const navigate = useNavigate();
@@ -43,11 +44,9 @@ const LoginScreen = () => {
     setError("");
 
     try {
-      const response = await fetch("http://localhost:5088/api/Auth/login", {
+      const response = await safeFetch("/Auth/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: formData.email,
           password: formData.password,
@@ -55,10 +54,19 @@ const LoginScreen = () => {
       });
 
       const data = await response.json();
+      console.debug("Login response:", data);
 
-      if (data.success) {
+      // Try to locate token in common locations to be resilient with backend shape
+      const tokenValue =
+        data?.token ??
+        data?.access_token ??
+        data?.data?.token ??
+        data?.result?.token ??
+        data?.accessToken;
+
+      if (data.success && tokenValue) {
         // Guardar token en localStorage
-        localStorage.setItem("authToken", data.token);
+        localStorage.setItem("authToken", tokenValue);
         // Guardar username del formulario como nombre del usuario
         localStorage.setItem("username", formData.email);
         // Guardar datos del usuario si están disponibles
@@ -68,7 +76,17 @@ const LoginScreen = () => {
         console.log("Login exitoso:", data.message);
         navigate("/dashboard");
       } else {
-        setError(data.message || "Error en el login");
+        // If backend returned success but no token, show helpful message
+        if (data.success && !tokenValue) {
+          console.error(
+            "Login responded success but no token found in response"
+          );
+          setError(
+            "Login exitoso pero no se recibió token. Verifique la respuesta del servidor."
+          );
+        } else {
+          setError(data.message || "Error en el login");
+        }
       }
     } catch (err) {
       setError(
@@ -197,13 +215,16 @@ const LoginScreen = () => {
                     className="h-4 w-4 text-[#035397] focus:ring-[#035397] border-gray-300 rounded"
                     disabled={isLoading}
                   />
-                  <label htmlFor="rememberMe" className="ml-2 block text-sm text-gray-700">
+                  <label
+                    htmlFor="rememberMe"
+                    className="ml-2 block text-sm text-gray-700"
+                  >
                     Recordarme
                   </label>
                 </div>
                 <button
                   type="button"
-                  onClick={() => navigate('/forgot-password')}
+                  onClick={() => navigate("/forgot-password")}
                   className="text-sm text-[#035397] hover:text-blue-800 font-medium transition-colors duration-200"
                 >
                   ¿Olvidaste tu contraseña?

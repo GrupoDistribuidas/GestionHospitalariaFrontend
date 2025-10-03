@@ -1,7 +1,14 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, ArrowLeft, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import {
+  Mail,
+  ArrowLeft,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
 import logo from "../../assets/logo.png";
+import { safeFetch } from "../../services/apiClient";
 
 const ForgotPasswordScreen = () => {
   const navigate = useNavigate();
@@ -25,29 +32,33 @@ const ForgotPasswordScreen = () => {
     setMessageType("");
 
     try {
-      const response = await fetch("http://localhost:5088/api/auth/forgot-password", {
+      const response = await safeFetch("/auth/forgot-password", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username: username.trim(),
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim() }),
       });
 
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setMessage(data.message || "Correo de recuperación enviado exitosamente. Revisa tu bandeja de entrada.");
+        setMessage(
+          data.message ||
+            "Correo de recuperación enviado exitosamente. Revisa tu bandeja de entrada."
+        );
         setMessageType("success");
         setEmailSent(true); // Marcar que el correo fue enviado
         setUsername(""); // Limpiar el campo
       } else {
-        setMessage(data.message || "Error al enviar el correo. Verifica que tu username sea correcto y que tengas un email registrado.");
+        setMessage(
+          data.message ||
+            "Error al enviar el correo. Verifica que tu username sea correcto y que tengas un email registrado."
+        );
         setMessageType("error");
       }
     } catch (err) {
-      setMessage("Error de conexión. Verifique que el servidor esté funcionando.");
+      setMessage(
+        "Error de conexión. Verifique que el servidor esté funcionando."
+      );
       setMessageType("error");
       console.error("Error en recuperación de contraseña:", err);
     } finally {
@@ -60,7 +71,7 @@ const ForgotPasswordScreen = () => {
     e?.stopPropagation();
     console.log("Botón Volver al Login clickeado"); // Debug log
     console.log("Navigate function:", navigate); // Debug log
-    
+
     try {
       navigate("/login", { replace: true });
       console.log("Navigate ejecutado exitosamente"); // Debug log
@@ -74,8 +85,7 @@ const ForgotPasswordScreen = () => {
   return (
     <div className="h-screen w-screen bg-gradient-to-br from-[#FCF7F8] via-[#FCF7F8] to-[#f8f1f3] flex items-center justify-center overflow-hidden">
       {/* Background Pattern */}
-<div className="absolute inset-0 opacity-5 pointer-events-none">
-
+      <div className="absolute inset-0 opacity-5 pointer-events-none">
         <div className="absolute top-10 left-10 w-6 h-6 text-[#035397]">
           <Mail className="w-full h-full" />
         </div>
@@ -106,7 +116,8 @@ const ForgotPasswordScreen = () => {
               Recuperar Contraseña
             </h1>
             <p className="text-blue-100 text-sm">
-              Ingresa tu nombre de usuario para recibir instrucciones de recuperación
+              Ingresa tu nombre de usuario para recibir instrucciones de
+              recuperación
             </p>
           </div>
 
@@ -191,7 +202,7 @@ const ForgotPasswordScreen = () => {
               type="button"
               onClick={handleBackToLogin}
               className="w-full flex items-center justify-center text-[#035397] hover:text-blue-800 font-medium py-3 px-4 transition-colors duration-200 mt-4 border border-transparent hover:border-blue-200 rounded-lg cursor-pointer"
-              style={{ touchAction: 'manipulation' }}
+              style={{ touchAction: "manipulation" }}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Volver al Login
@@ -201,7 +212,8 @@ const ForgotPasswordScreen = () => {
           {/* Footer */}
           <div className="px-8 py-4 bg-gray-50 border-t">
             <p className="text-xs text-gray-500 text-center">
-              Si no recibes el correo, verifica tu carpeta de spam o contacta al administrador del sistema.
+              Si no recibes el correo, verifica tu carpeta de spam o contacta al
+              administrador del sistema.
             </p>
           </div>
         </div>

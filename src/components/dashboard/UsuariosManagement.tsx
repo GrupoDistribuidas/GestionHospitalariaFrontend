@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, Eye, Edit, Trash2, Users, AlertCircle, CheckCircle, XCircle, Loader2,} from "lucide-react";
+import {
+  Search,
+  Plus,
+  Eye,
+  Edit,
+  Trash2,
+  AlertCircle,
+  CheckCircle,
+  XCircle,
+  Loader2,
+} from "lucide-react";
+import Alert from "../common/Alert";
 
 interface Usuario {
   idUsuario: number;
@@ -10,13 +21,14 @@ interface Usuario {
   estado: string; // "Activo" or "Inactivo"
 }
 
-const API_BASE = "http://localhost:5088/api";
+import { getAuthHeaders, safeFetch } from "../../services/apiClient";
+import { isAdmin } from "../../services/auth";
 
-const roles: { [key: number]: string } = {
-  1: "Administrador",
-  2: "Médico",
-  3: "Enfermera",
-  4: "Recepcionista",
+// Sólo los roles permitidos en la aplicación (lista usada directamente en el JSX)
+// Mapping mínimo a idTipo para compatibilidad con endpoints que esperan idTipo
+const ROLE_TO_TIPO: { [key: string]: number } = {
+  Usuario: 2,
+  Admin: 1,
 };
 
 const UsuariosManagement: React.FC = () => {
@@ -43,8 +55,7 @@ const UsuariosManagement: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    if (!token) {
+    if (!localStorage.getItem("authToken")) {
       navigate("/login");
       return;
     }
@@ -52,15 +63,56 @@ const UsuariosManagement: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Hardcode for demo; in real, fetch from API if available
-    setCentrosMedicos([
-      { idCentroMedico: 1, nombre: "UC" },
-      { idCentroMedico: 2, nombre: "Cardiología" },
-    ]);
-    setEspecialidades([
-      { idEspecialidad: 1, nombre: "Medicina General" },
-      { idEspecialidad: 2, nombre: "Cardiología" },
-    ]);
+    // Cargar medicos (como usuarios) y especialidades; derivar centros desde medicos
+    const loadMeta = async () => {
+      try {
+        const headers = getAuthHeaders();
+        const [medRes, espRes] = await Promise.all([
+          safeFetch("/medicos", { headers }),
+          safeFetch("/especialidades", { headers }),
+        ]);
+
+        if (medRes.ok) {
+          const med = await medRes.json();
+          const medicosList = Array.isArray(med) ? med : med.medicos ?? [];
+          // derive centros
+          const centrosMap = new Map<
+            number,
+            { idCentroMedico: number; nombre: string }
+          >();
+          medicosList.forEach((m: any) => {
+            if (m.idCentroMedico != null && !centrosMap.has(m.idCentroMedico)) {
+              let nombre = `Centro ${m.idCentroMedico}`;
+              if (m.idCentroMedico === 1) nombre = "Hospital Central";
+              if (m.idCentroMedico === 2) nombre = "Clínica Norte";
+              if (m.idCentroMedico === 3) nombre = "Policlínico Sur";
+              centrosMap.set(m.idCentroMedico, {
+                idCentroMedico: m.idCentroMedico,
+                nombre,
+              });
+            }
+          });
+          setCentrosMedicos(Array.from(centrosMap.values()));
+          // Do NOT set usuarios here; usuarios are fetched from /usuarios endpoint
+          // (we only derive centrosMedicos from medicos list)
+        } else {
+          setCentrosMedicos([]);
+          setUsuarios([]);
+        }
+
+        if (espRes.ok) {
+          const es = await espRes.json();
+          setEspecialidades(Array.isArray(es) ? es : es.especialidades ?? []);
+        } else {
+          setEspecialidades([]);
+        }
+      } catch (err) {
+        setCentrosMedicos([]);
+        setEspecialidades([]);
+        setUsuarios([]);
+      }
+    };
+    loadMeta();
   }, []);
 
   useEffect(() => {
@@ -76,25 +128,28 @@ const UsuariosManagement: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     setError("");
-    const token = localStorage.getItem("authToken");
     try {
-      const res = await fetch(`${API_BASE}/medicos`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      // Use the API Gateway /usuarios endpoint to get real users with roles
+      const res = await safeFetch(`/usuarios`, { headers: getAuthHeaders() });
 
       if (!res.ok) {
         if (res.status === 401) navigate("/login");
         throw new Error("Error fetching usuarios");
       }
 
-      const medicosData = await res.json();
+      const usuariosResp = await res.json();
+      // ApiGateway returns an object { success, message, usuarios }
+      const usuariosArray = Array.isArray(usuariosResp?.usuarios)
+        ? usuariosResp.usuarios
+        : usuariosResp;
+
       setUsuarios(
-        medicosData.map((m: any) => ({
-          idUsuario: m.idEmpleado,
-          nombre: m.nombre,
-          email: m.email,
-          rol: roles[m.idTipo] || "Usuario",
-          estado: m.estado,
+        usuariosArray.map((u: any) => ({
+          idUsuario: u.idUsuario ?? u.IdUsuario ?? u.id_usuario ?? 0,
+          nombre: u.nombreUsuario ?? u.nombre ?? u.NombreUsuario ?? "",
+          email: u.email ?? u.emailEmpleado ?? u.empleado?.email ?? "",
+          rol: u.rol ?? u.Rol ?? "Usuario",
+          estado: u.estado ?? "Activo",
         }))
       );
     } catch (err) {
@@ -106,21 +161,14 @@ const UsuariosManagement: React.FC = () => {
 
   const handleCreateUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = localStorage.getItem("authToken");
     try {
-      const idTipo =
-        Object.keys(roles).find(
-          (key) => roles[parseInt(key)] === formData.rol
-        ) || "2";
-      const res = await fetch(`${API_BASE}/medicos`, {
+      const idTipo = ROLE_TO_TIPO[formData.rol] || ROLE_TO_TIPO.Usuario;
+      const res = await safeFetch(`/medicos`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
           idCentroMedico: parseInt(formData.idCentroMedico) || 1,
-          idTipo: parseInt(idTipo),
+          idTipo: parseInt(idTipo as any),
           idEspecialidad: parseInt(formData.idEspecialidad) || 1,
           nombre: formData.nombre,
           telefono: formData.telefono || "",
@@ -135,11 +183,15 @@ const UsuariosManagement: React.FC = () => {
       setShowModal("none");
       setFormData({});
       setNotification({
-        message: "Usuario creado exitosamente",
+        message: "Usuario creado correctamente.",
         type: "success",
       });
     } catch (err) {
-      setNotification({ message: "Error creando usuario", type: "error" });
+      setNotification({
+        message:
+          "No fue posible crear el usuario. Revise los datos e intente nuevamente.",
+        type: "error",
+      });
       setError("Error creating usuario");
     }
   };
@@ -147,33 +199,23 @@ const UsuariosManagement: React.FC = () => {
   const handleUpdateUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedUsuario) return;
-    const token = localStorage.getItem("authToken");
     try {
-      const idTipo =
-        Object.keys(roles).find(
-          (key) => roles[parseInt(key)] === formData.rol
-        ) || "2";
-      const res = await fetch(
-        `${API_BASE}/medicos/${selectedUsuario.idUsuario}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            idCentroMedico: parseInt(formData.idCentroMedico) || 1,
-            idTipo: parseInt(idTipo),
-            idEspecialidad: parseInt(formData.idEspecialidad) || 1,
-            nombre: formData.nombre,
-            telefono: formData.telefono || "",
-            email: formData.email,
-            salario: parseFloat(formData.salario) || 0,
-            horario: formData.horario || "",
-            estado: formData.estado || "Activo",
-          }),
-        }
-      );
+      const idTipo = ROLE_TO_TIPO[formData.rol] || ROLE_TO_TIPO.Usuario;
+      const res = await safeFetch(`/medicos/${selectedUsuario.idUsuario}`, {
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          idCentroMedico: parseInt(formData.idCentroMedico) || 1,
+          idTipo: parseInt(idTipo as any),
+          idEspecialidad: parseInt(formData.idEspecialidad) || 1,
+          nombre: formData.nombre,
+          telefono: formData.telefono || "",
+          email: formData.email,
+          salario: parseFloat(formData.salario) || 0,
+          horario: formData.horario || "",
+          estado: formData.estado || "Activo",
+        }),
+      });
       if (!res.ok) throw new Error("Error updating usuario");
       setNotification({
         message: "El usuario ha sido actualizado exitosamente.",
@@ -194,15 +236,11 @@ const UsuariosManagement: React.FC = () => {
 
   const handleDeleteUsuario = async () => {
     if (!selectedUsuario) return;
-    const token = localStorage.getItem("authToken");
     try {
-      const res = await fetch(
-        `${API_BASE}/medicos/${selectedUsuario.idUsuario}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res = await safeFetch(`/medicos/${selectedUsuario.idUsuario}`, {
+        method: "DELETE",
+        headers: getAuthHeaders(),
+      });
       if (!res.ok) throw new Error("Error deleting usuario");
       setNotification({
         message: "El usuario ha sido eliminado exitosamente.",
@@ -275,31 +313,20 @@ const UsuariosManagement: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 p-4">
+    <div className="p-6 space-y-6">
+      {notification && (
+        <Alert
+          type={notification.type === "success" ? "success" : "error"}
+          message={notification.message}
+          onClose={() => setNotification(null)}
+        />
+      )}
+
       {/* Header */}
       <div className="bg-[#035397] text-white rounded-2xl p-6 text-center shadow-xl">
         <h1 className="text-3xl font-bold mb-2">GESTIÓN DE USUARIOS</h1>
         <p className="opacity-90">Administración de usuarios del sistema</p>
       </div>
-
-      {/* Notification */}
-      {notification && (
-        <div
-          className={`p-4 rounded-lg border ${
-            notification.type === "success"
-              ? "bg-green-100 text-green-800 border-green-300"
-              : "bg-red-100 text-red-800 border-red-300"
-          }`}
-        >
-          {notification.message}
-          <button
-            onClick={() => setNotification(null)}
-            className="float-right ml-4 text-lg"
-          >
-            &times;
-          </button>
-        </div>
-      )}
 
       {/* Search and Add Button */}
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
@@ -313,13 +340,15 @@ const UsuariosManagement: React.FC = () => {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#035397]"
           />
         </div>
-        <button
-          onClick={() => openModal("createUsuario")}
-          className="flex items-center gap-2 bg-[#035397] text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Agregar Usuario
-        </button>
+        {isAdmin() && (
+          <button
+            onClick={() => openModal("createUsuario")}
+            className="flex items-center gap-2 bg-[#035397] text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Agregar Usuario
+          </button>
+        )}
       </div>
 
       {/* Content */}
@@ -367,18 +396,22 @@ const UsuariosManagement: React.FC = () => {
                     >
                       <Eye className="w-4 h-4" />
                     </button>
-                    <button
-                      onClick={() => openModal("editUsuario", usuario)}
-                      className="text-green-600 hover:text-green-900"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => openModal("deleteUsuario", usuario)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {isAdmin() && (
+                      <>
+                        <button
+                          onClick={() => openModal("editUsuario", usuario)}
+                          className="text-green-600 hover:text-green-900"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => openModal("deleteUsuario", usuario)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -427,24 +460,46 @@ const UsuariosManagement: React.FC = () => {
                 }
                 className="w-full p-2 border rounded mb-2"
               />
-              <select
-                value={formData.idCentroMedico || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, idCentroMedico: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              >
-                <option value="">Seleccionar Centro Médico</option>
-                {centrosMedicos.map((centro) => (
-                  <option
-                    key={centro.idCentroMedico}
-                    value={centro.idCentroMedico}
-                  >
-                    {centro.nombre}
-                  </option>
-                ))}
-              </select>
+              {centrosMedicos.length > 0 ? (
+                <select
+                  value={formData.idCentroMedico || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, idCentroMedico: e.target.value })
+                  }
+                  className="w-full p-2 border rounded mb-2"
+                  required
+                >
+                  <option value="">Seleccionar Centro Médico</option>
+                  {centrosMedicos.map((centro) => (
+                    <option
+                      key={centro.idCentroMedico}
+                      value={centro.idCentroMedico}
+                    >
+                      {centro.nombre}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div>
+                  <input
+                    type="number"
+                    placeholder="Ingrese id de Centro Médico"
+                    value={formData.idCentroMedico || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        idCentroMedico: e.target.value,
+                      })
+                    }
+                    className="w-full p-2 border rounded mb-2"
+                    required
+                  />
+                  <p className="text-sm text-yellow-600 mt-1">
+                    No se encontraron centros desde la API. Introduzca
+                    manualmente el identificador numérico del centro.
+                  </p>
+                </div>
+              )}
               <select
                 value={formData.idEspecialidad || ""}
                 onChange={(e) =>
@@ -487,10 +542,8 @@ const UsuariosManagement: React.FC = () => {
                 required
               >
                 <option value="">Seleccionar Rol</option>
-                <option value="Administrador">Administrador</option>
-                <option value="Médico">Médico</option>
-                <option value="Enfermera">Enfermera</option>
-                <option value="Recepcionista">Recepcionista</option>
+                <option value="Usuario">Usuario</option>
+                <option value="Admin">Admin</option>
               </select>
               <select
                 value={formData.estado || ""}
@@ -618,10 +671,8 @@ const UsuariosManagement: React.FC = () => {
                 required
               >
                 <option value="">Seleccionar Rol</option>
-                <option value="Administrador">Administrador</option>
-                <option value="Médico">Médico</option>
-                <option value="Enfermera">Enfermera</option>
-                <option value="Recepcionista">Recepcionista</option>
+                <option value="Usuario">Usuario</option>
+                <option value="Admin">Admin</option>
               </select>
               <select
                 value={formData.estado || ""}

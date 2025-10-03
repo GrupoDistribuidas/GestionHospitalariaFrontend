@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar, Clock, Users, FileText } from "lucide-react";
+import { consultationService } from "../../services/consultationService";
+import { appointmentsService } from "../../services/appointmentsService";
+import { safeFetch, getAuthHeaders } from "../../services/apiClient";
 
 interface Stats {
   pending: number;
@@ -31,9 +34,114 @@ const DashboardContent: React.FC = () => {
     const storedUsername = localStorage.getItem("username");
     setUserName(storedUsername ? storedUsername : "Usuario");
 
-    // TODO: reemplazar por endpoints reales cuando estén listos
-    setStats({ pending: 12, general: 84, calendar: 5, patients: 132 });
-    setLoading(false);
+    // Cargar datos reales desde los servicios (resiliente)
+    const load = async () => {
+      setLoading(true);
+      try {
+        const statsPromise = consultationService
+          .fetchEstadisticasConsultas()
+          .catch((err) => {
+            console.error("fetchEstadisticasConsultas failed:", err);
+            return null;
+          });
+
+        const consultasPromise = appointmentsService
+          .fetchTodasConsultas()
+          .catch((err) => {
+            console.error("fetchTodasConsultas failed:", err);
+            return [] as any[];
+          });
+
+        const pacientesPromise = (async () => {
+          try {
+            const res = await safeFetch("/pacientes", {
+              headers: getAuthHeaders(),
+            });
+            if (!res.ok) {
+              const t = await res.text();
+              console.error("/pacientes returned non-ok:", res.status, t);
+              return [] as any[];
+            }
+            const d = await res.json();
+            return Array.isArray(d) ? d : d?.pacientes ?? [];
+          } catch (err) {
+            console.error("fetch /pacientes failed:", err);
+            return [] as any[];
+          }
+        })();
+
+        const [statsResp, consultasResp, pacientesResp] = await Promise.all([
+          statsPromise,
+          consultasPromise,
+          pacientesPromise,
+        ]);
+
+        const consultas = Array.isArray(consultasResp) ? consultasResp : [];
+        const pacientesList = Array.isArray(pacientesResp) ? pacientesResp : [];
+
+        // calcular pendientes: consultas futuras (fecha >= today)
+        const today = new Date();
+        const upcoming = consultas.filter((c: any) => {
+          try {
+            const fecha = new Date(
+              c.fecha ??
+                c.Fecha ??
+                c.fechaConsulta ??
+                c.fecha_registro ??
+                c.date
+            );
+            return (
+              fecha >=
+              new Date(today.getFullYear(), today.getMonth(), today.getDate())
+            );
+          } catch {
+            return false;
+          }
+        });
+
+        // calendario: próximas 7 días
+        const in7days = consultas.filter((c: any) => {
+          try {
+            const fecha = new Date(
+              c.fecha ??
+                c.Fecha ??
+                c.fechaConsulta ??
+                c.fecha_registro ??
+                c.date
+            );
+            const diff =
+              (fecha.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+            return diff >= 0 && diff <= 7;
+          } catch {
+            return false;
+          }
+        });
+
+        const everythingEmpty =
+          !statsResp && consultas.length === 0 && pacientesList.length === 0;
+        if (everythingEmpty) {
+          setError(
+            "No se pudieron cargar las métricas del panel. Verifique que el servidor esté disponible."
+          );
+        }
+
+        setStats({
+          pending: upcoming.length,
+          general: statsResp?.totalConsultas ?? consultas.length,
+          calendar: in7days.length,
+          patients: pacientesList.length,
+        });
+      } catch (err) {
+        console.error("Unexpected error loading dashboard stats:", err);
+        setError(
+          "No se pudieron cargar las métricas del panel. Verifique que el servidor esté disponible."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
   }, [navigate]);
 
   if (loading) {
@@ -52,6 +160,9 @@ const DashboardContent: React.FC = () => {
 
   return (
     <div className="space-y-8 p-4">
+      {error && (
+        <div className="mb-4 p-3 bg-red-100 text-red-800 rounded">{error}</div>
+      )}
       {/* Hero Greeting Section */}
       <div className="bg-gradient-to-r from-[#035397] to-blue-600 text-white rounded-2xl p-8 text-center shadow-xl animate-fade-in">
         <h1 className="text-4xl md:text-5xl font-bold mb-2">
@@ -63,7 +174,8 @@ const DashboardContent: React.FC = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">{/* 👈 4 columnas */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* 👈 4 columnas */}
         <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transform hover:scale-105 transition-all duration-300 animate-fade-in">
           <div className="flex items-center">
             <div className="p-3 bg-blue-50 rounded-full mr-4">
@@ -73,7 +185,9 @@ const DashboardContent: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-700 mb-1">
                 Agenda Pendiente
               </h3>
-              <p className="text-3xl font-bold text-gray-900">{stats.pending}</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {stats.pending}
+              </p>
               <p className="text-sm text-gray-500 mt-1">Citas por confirmar</p>
             </div>
           </div>
@@ -88,7 +202,9 @@ const DashboardContent: React.FC = () => {
               <h3 className="text-lg font-semibold text-gray-700 mb-1">
                 Resumen General
               </h3>
-              <p className="text-3xl font-bold text-gray-900">{stats.general}</p>
+              <p className="text-3xl font-bold text-gray-900">
+                {stats.general}
+              </p>
               <p className="text-sm text-gray-500 mt-1">Registros totales</p>
             </div>
           </div>
