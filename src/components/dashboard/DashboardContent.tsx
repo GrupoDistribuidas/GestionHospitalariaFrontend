@@ -4,6 +4,7 @@ import { Calendar, Clock, Users, FileText } from "lucide-react";
 import { consultationService } from "../../services/consultationService";
 import { appointmentsService } from "../../services/appointmentsService";
 import { safeFetch, getAuthHeaders } from "../../services/apiClient";
+import { isAdmin } from "../../services/auth";
 
 interface Stats {
   pending: number;
@@ -85,10 +86,10 @@ const DashboardContent: React.FC = () => {
           try {
             const fecha = new Date(
               c.fecha ??
-                c.Fecha ??
-                c.fechaConsulta ??
-                c.fecha_registro ??
-                c.date
+              c.Fecha ??
+              c.fechaConsulta ??
+              c.fecha_registro ??
+              c.date
             );
             return (
               fecha >=
@@ -104,10 +105,10 @@ const DashboardContent: React.FC = () => {
           try {
             const fecha = new Date(
               c.fecha ??
-                c.Fecha ??
-                c.fechaConsulta ??
-                c.fecha_registro ??
-                c.date
+              c.Fecha ??
+              c.fechaConsulta ??
+              c.fecha_registro ??
+              c.date
             );
             const diff =
               (fecha.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
@@ -255,12 +256,14 @@ const DashboardContent: React.FC = () => {
           Acciones Rápidas
         </h2>
         <div className="flex flex-col sm:flex-row gap-4">
-          <button
-            onClick={() => navigate("/agenda")}
-            className="bg-gradient-to-r from-[#035397] to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-md flex-1 text-center"
-          >
-            📅 Agenda Cita
-          </button>
+          {!isAdmin() && (
+            <button
+              onClick={() => navigate("/agenda")}
+              className="bg-gradient-to-r from-[#035397] to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 shadow-md flex-1 text-center"
+            >
+              📅 Agenda Cita
+            </button>
+          )}
           <button
             onClick={() => navigate("/calendario")}
             className="bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 px-6 py-3 rounded-lg font-semibold hover:bg-gray-300 transition-all duration-300 transform hover:scale-105 shadow-md flex-1 text-center border border-gray-300"
