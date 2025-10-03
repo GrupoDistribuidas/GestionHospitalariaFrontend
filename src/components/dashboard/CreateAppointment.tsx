@@ -14,6 +14,7 @@ interface Medico {
   nombre: string;
   apellido: string;
   especialidad?: string;
+  estado?: string;
 }
 
 const CreateAppointment: React.FC = () => {
@@ -39,6 +40,7 @@ const CreateAppointment: React.FC = () => {
   });
 
   useEffect(() => {
+    
     const fetchLists = async () => {
       try {
         const headers = getAuthHeaders();
@@ -81,11 +83,11 @@ const CreateAppointment: React.FC = () => {
           pacArray.map((p: any, idx: number) => {
             const id = Number(
               p.idPaciente ??
-                p.id_paciente ??
-                p.id ??
-                p.idPaciente ??
-                p.id ??
-                idx + 1
+              p.id_paciente ??
+              p.id ??
+              p.idPaciente ??
+              p.id ??
+              idx + 1
             );
             return {
               id,
@@ -97,14 +99,21 @@ const CreateAppointment: React.FC = () => {
 
         setMedicos(
           medArray.map((m: any, idx: number) => {
-            const id = Number(
-              m.idMedico ?? m.id_medico ?? m.id ?? m.idMedico ?? idx + 1
-            );
+            const id = Number(m.idMedico ?? m.id_medico ?? m.id ?? idx + 1);
+            // normalizamos el estado con varios posibles nombres/códigos
+            const rawEstado =
+              m.estado ??
+              m.estatus ??
+              m.status ??
+              (typeof m.activo === "boolean" ? (m.activo ? "Activo" : "Inactivo") : undefined) ??
+              (m.activo === 1 ? "Activo" : m.activo === 0 ? "Inactivo" : undefined);
+
             return {
               id,
               nombre: m.nombre ?? m.nombres ?? m.nombreMedico ?? "Médico",
               apellido: m.apellido ?? m.apellidos ?? "",
               especialidad: m.especialidad ?? m.nombreEspecialidad ?? "",
+              estado: rawEstado ?? "Activo",
             } as Medico;
           })
         );
@@ -121,6 +130,7 @@ const CreateAppointment: React.FC = () => {
 
     fetchLists();
   }, []);
+  
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -143,6 +153,24 @@ const CreateAppointment: React.FC = () => {
     () => medicos.find((m) => String(m.id) === String(form.id_medico)),
     [medicos, form.id_medico]
   );
+  const medicosHabilitados = useMemo<Medico[]>(() => {
+    return medicos.filter((m) => {
+      const normalized = String(
+        typeof m.estado === "boolean"
+          ? m.estado ? "Activo" : "Inactivo"
+          : m.estado ?? "Activo"
+      ).toLowerCase();
+
+      // acepta varias convenciones de backend
+      return (
+        normalized === "activo" ||
+        normalized === "habilitado" ||
+        normalized === "true" ||
+        normalized === "1"
+      );
+    });
+  }, [medicos]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,9 +323,8 @@ const CreateAppointment: React.FC = () => {
                 name="id_paciente"
                 value={form.id_paciente}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border ${
-                  fieldErrors.id_paciente ? "border-red-300" : "border-gray-300"
-                }`}
+                className={`mt-1 block w-full rounded-md border ${fieldErrors.id_paciente ? "border-red-300" : "border-gray-300"
+                  }`}
                 aria-invalid={!!fieldErrors.id_paciente}
               >
                 <option value="">-- Seleccione paciente --</option>
@@ -329,28 +356,22 @@ const CreateAppointment: React.FC = () => {
                 name="id_medico"
                 value={form.id_medico}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border ${
-                  fieldErrors.id_medico ? "border-red-300" : "border-gray-300"
-                }`}
+                className={`mt-1 block w-full rounded-md border ${fieldErrors.id_medico ? "border-red-300" : "border-gray-300"
+                  }`}
                 aria-invalid={!!fieldErrors.id_medico}
               >
                 <option value="">-- Seleccione médico --</option>
-                {medicos.map((m) => (
-                  <option
-                    key={m.id ?? `med-${m.nombre}`}
-                    value={String(m.id)}
-                  >{`${m.nombre} ${m.apellido}${
-                    m.especialidad ? ` - ${m.especialidad}` : ""
-                  }`}</option>
+                {medicosHabilitados.map((m) => (
+                  <option key={m.id ?? `med-${m.nombre}`} value={String(m.id)}>
+                    {`${m.nombre} ${m.apellido}${m.especialidad ? ` - ${m.especialidad}` : ""}`}
+                  </option>
                 ))}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Se muestra la especialidad cuando está disponible.
+                Solo se muestran médicos habilitados.
               </p>
               {fieldErrors.id_medico && (
-                <p className="text-xs text-red-600 mt-1">
-                  {fieldErrors.id_medico}
-                </p>
+                <p className="text-xs text-red-600 mt-1">{fieldErrors.id_medico}</p>
               )}
             </div>
           </div>
@@ -386,11 +407,10 @@ const CreateAppointment: React.FC = () => {
                   </div>
                   <div className="text-xs text-gray-600">
                     {selectedMedico
-                      ? `${selectedMedico.nombre} ${selectedMedico.apellido}${
-                          selectedMedico.especialidad
-                            ? ` • ${selectedMedico.especialidad}`
-                            : ""
-                        }`
+                      ? `${selectedMedico.nombre} ${selectedMedico.apellido}${selectedMedico.especialidad
+                        ? ` • ${selectedMedico.especialidad}`
+                        : ""
+                      }`
                       : "Ninguno"}
                   </div>
                 </div>
@@ -411,9 +431,8 @@ const CreateAppointment: React.FC = () => {
                 type="date"
                 value={form.fecha}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border ${
-                  fieldErrors.fecha ? "border-red-300" : "border-gray-300"
-                }`}
+                className={`mt-1 block w-full rounded-md border ${fieldErrors.fecha ? "border-red-300" : "border-gray-300"
+                  }`}
               />
               {fieldErrors.fecha && (
                 <p className="text-xs text-red-600 mt-1">{fieldErrors.fecha}</p>
@@ -431,9 +450,8 @@ const CreateAppointment: React.FC = () => {
                 type="time"
                 value={form.hora}
                 onChange={handleChange}
-                className={`mt-1 block w-full rounded-md border ${
-                  fieldErrors.hora ? "border-red-300" : "border-gray-300"
-                }`}
+                className={`mt-1 block w-full rounded-md border ${fieldErrors.hora ? "border-red-300" : "border-gray-300"
+                  }`}
               />
               {fieldErrors.hora && (
                 <p className="text-xs text-red-600 mt-1">{fieldErrors.hora}</p>
@@ -450,9 +468,8 @@ const CreateAppointment: React.FC = () => {
               value={form.motivo}
               onChange={handleChange}
               rows={3}
-              className={`mt-1 block w-full rounded-md border ${
-                fieldErrors.motivo ? "border-red-300" : "border-gray-300"
-              }`}
+              className={`mt-1 block w-full rounded-md border ${fieldErrors.motivo ? "border-red-300" : "border-gray-300"
+                }`}
               placeholder="Describa brevemente el motivo de la consulta"
             />
             {fieldErrors.motivo && (

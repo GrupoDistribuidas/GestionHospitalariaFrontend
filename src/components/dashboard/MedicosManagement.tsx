@@ -12,6 +12,7 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
+  Mail, Phone, Building2, Clock, BadgeDollarSign,
 } from "lucide-react";
 import Alert from "../common/Alert";
 
@@ -36,7 +37,25 @@ interface Especialidad {
 
 import { safeFetch, getAuthHeaders } from "../../services/apiClient";
 import { isAdmin } from "../../services/auth";
+const cn = (...cls: (string | false | null | undefined)[]) => cls.filter(Boolean).join(" ");
 
+const getInitials = (name: string) =>
+  name
+    .split(" ")
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+const formatCurrency = (n: number | string) => {
+  const num = typeof n === "string" ? Number(n) : n;
+  if (isNaN(num as number)) return n as any;
+  return (num as number).toLocaleString("es-EC", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+  });
+};
 const MedicosManagement: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<string>(
@@ -306,17 +325,34 @@ const MedicosManagement: React.FC = () => {
     }
   };
 
+  // Después (soft-delete = marcar Inactivo)
   const handleDeleteMedico = async () => {
     if (!selectedMedico) return;
 
     try {
-      const res = await safeFetch(`/medicos/${selectedMedico.idEmpleado}`, {
-        method: "DELETE",
+      // Opción A (recomendada si tu API acepta PATCH parciales):
+      let res = await safeFetch(`/medicos/${selectedMedico.idEmpleado}`, {
+        method: "PATCH",
         headers: getAuthHeaders(),
+        body: JSON.stringify({ estado: "Inactivo" }),
       });
-      if (!res.ok) throw new Error("Error deleting medico");
+
+      // Fallback Opción B: si tu backend no soporta PATCH, usa PUT
+      if (!res.ok) {
+        res = await safeFetch(`/medicos/${selectedMedico.idEmpleado}`, {
+          method: "PUT",
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            ...selectedMedico,
+            estado: "Inactivo",
+          }),
+        });
+      }
+
+      if (!res.ok) throw new Error("No se pudo inactivar al médico.");
+
       setNotification({
-        message: "El médico ha sido eliminado correctamente.",
+        message: "El médico ha sido inactivado correctamente.",
         type: "success",
       });
       fetchData();
@@ -324,11 +360,11 @@ const MedicosManagement: React.FC = () => {
     } catch (err) {
       setNotification({
         message:
-          "Error eliminando médico: " +
+          "Error inactivando médico: " +
           (err instanceof Error ? err.message : "Error desconocido"),
         type: "error",
       });
-      setError("Error deleting medico");
+      setError("Error soft-delete medico");
     }
   };
 
@@ -465,11 +501,10 @@ const MedicosManagement: React.FC = () => {
 
   const StatusBadge = ({ estado }: { estado: string }) => (
     <span
-      className={`px-2 py-1 rounded-full text-xs font-semibold ${
-        estado === "Activo"
-          ? "bg-green-100 text-green-800"
-          : "bg-red-100 text-red-800"
-      }`}
+      className={`px-2 py-1 rounded-full text-xs font-semibold ${estado === "Activo"
+        ? "bg-green-100 text-green-800"
+        : "bg-red-100 text-red-800"
+        }`}
     >
       {estado === "Activo" ? (
         <CheckCircle className="w-3 h-3 inline mr-1" />
@@ -523,9 +558,8 @@ const MedicosManagement: React.FC = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
           <input
             type="text"
-            placeholder={`Buscar por ${
-              activeTab === "personal" ? "nombre" : "nombre de especialidad"
-            }`}
+            placeholder={`Buscar por ${activeTab === "personal" ? "nombre" : "nombre de especialidad"
+              }`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#035397]"
@@ -537,11 +571,10 @@ const MedicosManagement: React.FC = () => {
               setActiveTab("personal");
               setSearchParams({ tab: "personal" });
             }}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              activeTab === "personal"
-                ? "bg-[#035397] text-white"
-                : "text-gray-600 hover:text-[#035397]"
-            }`}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${activeTab === "personal"
+              ? "bg-[#035397] text-white"
+              : "text-gray-600 hover:text-[#035397]"
+              }`}
           >
             <User className="w-4 h-4 inline mr-2" />
             Personal Médico
@@ -551,11 +584,10 @@ const MedicosManagement: React.FC = () => {
               setActiveTab("especialidades");
               setSearchParams({ tab: "especialidades" });
             }}
-            className={`px-4 py-2 rounded-md font-medium transition-colors ${
-              activeTab === "especialidades"
-                ? "bg-[#035397] text-white"
-                : "text-gray-600 hover:text-[#035397]"
-            }`}
+            className={`px-4 py-2 rounded-md font-medium transition-colors ${activeTab === "especialidades"
+              ? "bg-[#035397] text-white"
+              : "text-gray-600 hover:text-[#035397]"
+              }`}
           >
             <Stethoscope className="w-4 h-4 inline mr-2" />
             Gestión Especialidades
@@ -714,359 +746,670 @@ const MedicosManagement: React.FC = () => {
         </div>
       )}
 
-      {/* Modals - Example for Medico Create/Edit; similar for others */}
+      {/* Create Medico Modal - NUEVO (reemplaza el actual) */}
       {showModal === "createMedico" && isAdmin() && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold mb-4">Crear Médico</h2>
-            <form onSubmit={handleCreateMedico}>
-              <input
-                type="text"
-                placeholder="Nombre"
-                value={formData.nombre || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, nombre: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Teléfono"
-                value={formData.telefono || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, telefono: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                value={formData.email || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-              />
-              <input
-                type="number"
-                placeholder="Salario"
-                value={formData.salario || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, salario: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Horario"
-                value={formData.horario || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, horario: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              />
-              {centrosMedicos.length > 0 ? (
-                <select
-                  value={formData.idCentroMedico || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, idCentroMedico: e.target.value })
-                  }
-                  className="w-full p-2 border rounded mb-2"
-                  required
-                >
-                  <option value="">Seleccionar Centro Médico</option>
-                  {centrosMedicos.map((centro) => (
-                    <option
-                      key={centro.idCentroMedico}
-                      value={centro.idCentroMedico}
-                    >
-                      {centro.nombre}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div>
-                  <input
-                    type="number"
-                    placeholder="Ingrese id de Centro Médico"
-                    value={formData.idCentroMedico || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        idCentroMedico: e.target.value,
-                      })
-                    }
-                    className="w-full p-2 border rounded mb-2"
-                    required
-                  />
-                  <p className="text-sm text-yellow-600 mt-1">
-                    No se encontraron centros desde la API. Introduzca
-                    manualmente el identificador numérico del centro.
-                  </p>
-                </div>
-              )}
-              <select
-                value={formData.idTipo || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, idTipo: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              >
-                <option value="">Seleccionar Tipo de Empleado</option>
-                {tiposEmpleado.map((tipo) => (
-                  <option key={tipo.idTipo} value={tipo.idTipo}>
-                    {tipo.tipo}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={formData.idEspecialidad || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, idEspecialidad: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              >
-                <option value="">Seleccionar Especialidad</option>
-                {especialidades.map((esp) => (
-                  <option key={esp.idEspecialidad} value={esp.idEspecialidad}>
-                    {esp.nombre}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={formData.estado || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, estado: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              >
-                <option value="">Seleccionar Estado</option>
-                <option value="Activo">Activo</option>
-                <option value="Inactivo">Inactivo</option>
-              </select>
-              <div className="flex justify-end space-x-2 mt-4">
+        <div className="fixed inset-0 z-50">
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm" onClick={closeModal} />
+          {/* Card */}
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+              {/* Header */}
+              <div className="relative">
+                <div className="h-24 bg-gradient-to-r from-[#035397] via-[#1b66c9] to-[#4aa0ff]" />
                 <button
-                  type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                  className="absolute top-3 right-3 inline-flex items-center justify-center rounded-full p-2 bg-white/90 hover:bg-white shadow"
+                  aria-label="Cerrar"
+                  title="Cerrar"
                 >
-                  Cancelar
+                  <XCircle className="w-5 h-5 text-gray-700" />
                 </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-[#035397] text-white rounded hover:bg-blue-600"
-                >
-                  Crear
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {showModal === "editMedico" && selectedMedico && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold mb-4">Editar Médico</h2>
-            <form onSubmit={handleUpdateMedico}>
-              <input
-                type="text"
-                placeholder="Nombre"
-                value={formData.nombre || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, nombre: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Teléfono"
-                value={formData.telefono || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, telefono: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                value={formData.email || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, email: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-              />
-              <input
-                type="number"
-                placeholder="Salario"
-                value={formData.salario || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, salario: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              />
-              <input
-                type="text"
-                placeholder="Horario"
-                value={formData.horario || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, horario: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              />
-              {centrosMedicos.length > 0 ? (
-                <select
-                  value={formData.idCentroMedico || ""}
-                  onChange={(e) =>
-                    setFormData({ ...formData, idCentroMedico: e.target.value })
-                  }
-                  className="w-full p-2 border rounded mb-2"
-                  required
-                >
-                  <option value="">Seleccionar Centro Médico</option>
-                  {centrosMedicos.map((centro) => (
-                    <option
-                      key={centro.idCentroMedico}
-                      value={centro.idCentroMedico}
-                    >
-                      {centro.nombre}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <div>
-                  <input
-                    type="number"
-                    placeholder="Ingrese id de Centro Médico"
-                    value={formData.idCentroMedico || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        idCentroMedico: e.target.value,
-                      })
-                    }
-                    className="w-full p-2 border rounded mb-2"
-                    required
-                  />
-                  <p className="text-sm text-yellow-600 mt-1">
-                    No se encontraron centros desde la API. Introduzca
-                    manualmente el identificador numérico del centro.
-                  </p>
+                <div className="px-6 -mt-10 pb-4 flex items-center gap-4">
+                  <div className="shrink-0 rounded-2xl border-4 border-white bg-[#0b3c7d] text-white w-16 h-16 grid place-items-center shadow-lg">
+                    <User className="w-7 h-7" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-xl md:text-2xl font-bold text-white drop-shadow">
+                      Crear Médico
+                    </h3>
+                    <p className="text-sm text-white/90">Registra un nuevo profesional</p>
+                  </div>
                 </div>
-              )}
-              <select
-                value={formData.idTipo || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, idTipo: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              >
-                <option value="">Seleccionar Tipo de Empleado</option>
-                {tiposEmpleado.map((tipo) => (
-                  <option key={tipo.idTipo} value={tipo.idTipo}>
-                    {tipo.tipo}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={formData.idEspecialidad || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, idEspecialidad: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              >
-                <option value="">Seleccionar Especialidad</option>
-                {especialidades.map((esp) => (
-                  <option key={esp.idEspecialidad} value={esp.idEspecialidad}>
-                    {esp.nombre}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={formData.estado || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, estado: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              >
-                <option value="">Seleccionar Estado</option>
-                <option value="Activo">Activo</option>
-                <option value="Inactivo">Inactivo</option>
-              </select>
-              <div className="flex justify-end space-x-2 mt-4">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-[#035397] text-white rounded hover:bg-blue-600"
-                >
-                  Actualizar
-                </button>
               </div>
-            </form>
-          </div>
-        </div>
-      )}
 
-      {/* View Medico Modal */}
-      {showModal === "viewMedico" && selectedMedico && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold mb-4">Ver Médico</h2>
-            <div className="space-y-2">
-              <p>
-                <strong>Nombre:</strong> {selectedMedico.nombre}
-              </p>
-              <p>
-                <strong>Teléfono:</strong>{" "}
-                {selectedMedico.telefono || "No especificado"}
-              </p>
-              <p>
-                <strong>Email:</strong>{" "}
-                {selectedMedico.email || "No especificado"}
-              </p>
-              <p>
-                <strong>Especialidad:</strong>{" "}
-                {getEspecialidadName(selectedMedico.idEspecialidad)}
-              </p>
-              <p>
-                <strong>Departamento:</strong>{" "}
-                {getCentroMedicoName(selectedMedico.idCentroMedico)}
-              </p>
-              <p>
-                <strong>Salario:</strong> ${selectedMedico.salario}
-              </p>
-              <p>
-                <strong>Horario:</strong> {selectedMedico.horario}
-              </p>
-              <p>
-                <strong>Estado:</strong> {selectedMedico.estado}
-              </p>
+              {/* Body */}
+              <form onSubmit={handleCreateMedico} className="px-6 py-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Nombre */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Nombre</label>
+                    <input
+                      type="text"
+                      value={formData.nombre || ""}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-[#035397] focus:outline-none"
+                      placeholder="Nombre completo"
+                      required
+                    />
+                  </div>
+
+                  {/* Teléfono */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Teléfono</label>
+                    <div className="mt-1 flex items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-[#035397]">
+                      <span className="pl-3 pr-2 text-gray-400">
+                        <Phone className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="text"
+                        value={formData.telefono || ""}
+                        onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                        className="w-full rounded-r-lg px-2 py-2 focus:outline-none"
+                        placeholder="+593 99 999 9999"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Email</label>
+                    <div className="mt-1 flex items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-[#035397]">
+                      <span className="pl-3 pr-2 text-gray-400">
+                        <Mail className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="email"
+                        value={formData.email || ""}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="w-full rounded-r-lg px-2 py-2 focus:outline-none"
+                        placeholder="correo@dominio.com"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Salario */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Salario</label>
+                    <div className="mt-1 flex items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-[#035397]">
+                      <span className="pl-3 pr-2 text-gray-400">
+                        <BadgeDollarSign className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.salario ?? ""}
+                        onChange={(e) => setFormData({ ...formData, salario: e.target.value })}
+                        className="w-full rounded-r-lg px-2 py-2 focus:outline-none"
+                        placeholder="0.00"
+                        required
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] text-gray-500">Se guarda en USD. Ej.: 1200.00</p>
+                  </div>
+
+                  {/* Horario */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Horario</label>
+                    <div className="mt-1 flex items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-[#035397]">
+                      <span className="pl-3 pr-2 text-gray-400">
+                        <Clock className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="text"
+                        value={formData.horario || ""}
+                        onChange={(e) => setFormData({ ...formData, horario: e.target.value })}
+                        className="w-full rounded-r-lg px-2 py-2 focus:outline-none"
+                        placeholder="L-V 08:00-16:00"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Centro Médico */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Centro Médico</label>
+                    <div className="mt-1 flex items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-[#035397]">
+                      <span className="pl-3 pr-2 text-gray-400">
+                        <Building2 className="w-4 h-4" />
+                      </span>
+                      {centrosMedicos.length > 0 ? (
+                        <select
+                          value={formData.idCentroMedico || ""}
+                          onChange={(e) => setFormData({ ...formData, idCentroMedico: e.target.value })}
+                          className="w-full rounded-r-lg px-2 py-2 bg-white focus:outline-none"
+                          required
+                        >
+                          <option value="" disabled>Seleccionar centro</option>
+                          {centrosMedicos.map((c) => (
+                            <option key={c.idCentroMedico} value={c.idCentroMedico}>
+                              {c.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="number"
+                          value={formData.idCentroMedico || ""}
+                          onChange={(e) => setFormData({ ...formData, idCentroMedico: e.target.value })}
+                          className="w-full rounded-r-lg px-2 py-2 focus:outline-none"
+                          placeholder="ID centro (numérico)"
+                          required
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tipo Empleado */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Tipo de Empleado</label>
+                    <select
+                      value={formData.idTipo || ""}
+                      onChange={(e) => setFormData({ ...formData, idTipo: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 bg-white focus:ring-2 focus:ring-[#035397] focus:outline-none"
+                      required
+                    >
+                      <option value="" disabled>Seleccionar tipo</option>
+                      {tiposEmpleado.map((t) => (
+                        <option key={t.idTipo} value={t.idTipo}>{t.tipo}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Especialidad */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Especialidad</label>
+                    <select
+                      value={formData.idEspecialidad || ""}
+                      onChange={(e) => setFormData({ ...formData, idEspecialidad: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 bg-white focus:ring-2 focus:ring-[#035397] focus:outline-none"
+                      required
+                    >
+                      <option value="" disabled>Seleccionar especialidad</option>
+                      {especialidades.map((esp) => (
+                        <option key={esp.idEspecialidad} value={esp.idEspecialidad}>
+                          {esp.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Estado (por defecto Activo) */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Estado</label>
+                    <select
+                      value={formData.estado || "Activo"}
+                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 bg-white focus:ring-2 focus:ring-[#035397] focus:outline-none"
+                      required
+                    >
+                      <option value="Activo">Activo</option>
+                      <option value="Inactivo">Inactivo</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-6 flex items-center justify-end gap-2 border-t pt-4">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#035397] text-white hover:bg-blue-600"
+                  >
+                    <Plus className="w-4 h-4" /> Crear
+                  </button>
+                </div>
+              </form>
             </div>
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={closeModal}
-                className="px-4 py-2 bg-[#035397] text-white rounded hover:bg-blue-600"
-              >
-                Cerrar
-              </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Medico Modal - NUEVO */}
+      {showModal === "editMedico" && selectedMedico && (
+        <div className="fixed inset-0 z-50">
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm" onClick={closeModal} />
+          {/* Card */}
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+              {/* Header */}
+              <div className="relative">
+                <div className="h-24 bg-gradient-to-r from-[#035397] via-[#1b66c9] to-[#4aa0ff]" />
+                <button
+                  onClick={closeModal}
+                  className="absolute top-3 right-3 inline-flex items-center justify-center rounded-full p-2 bg-white/90 hover:bg-white shadow"
+                  aria-label="Cerrar"
+                  title="Cerrar"
+                >
+                  <XCircle className="w-5 h-5 text-gray-700" />
+                </button>
+                <div className="px-6 -mt-10 pb-4 flex items-center gap-4">
+                  <div className="shrink-0 rounded-2xl border-4 border-white bg-[#0b3c7d] text-white w-16 h-16 grid place-items-center shadow-lg">
+                    <User className="w-7 h-7" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-xl md:text-2xl font-bold text-white drop-shadow">
+                      Editar Médico
+                    </h3>
+                    <p className="text-sm text-white/90 truncate">
+                      {selectedMedico.nombre}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Body */}
+              <form onSubmit={handleUpdateMedico} className="px-6 py-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Nombre */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Nombre</label>
+                    <input
+                      type="text"
+                      value={formData.nombre || ""}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-[#035397] focus:outline-none"
+                      placeholder="Nombre completo"
+                      required
+                    />
+                  </div>
+
+                  {/* Teléfono */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Teléfono</label>
+                    <div className="mt-1 flex items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-[#035397]">
+                      <span className="pl-3 pr-2 text-gray-400">
+                        <Phone className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="text"
+                        value={formData.telefono || ""}
+                        onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
+                        className="w-full rounded-r-lg px-2 py-2 focus:outline-none"
+                        placeholder="+593 99 999 9999"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Email</label>
+                    <div className="mt-1 flex items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-[#035397]">
+                      <span className="pl-3 pr-2 text-gray-400">
+                        <Mail className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="email"
+                        value={formData.email || ""}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="w-full rounded-r-lg px-2 py-2 focus:outline-none"
+                        placeholder="correo@dominio.com"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Salario */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Salario</label>
+                    <div className="mt-1 flex items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-[#035397]">
+                      <span className="pl-3 pr-2 text-gray-400">
+                        <BadgeDollarSign className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={formData.salario ?? ""}
+                        onChange={(e) => setFormData({ ...formData, salario: e.target.value })}
+                        className="w-full rounded-r-lg px-2 py-2 focus:outline-none"
+                        placeholder="0.00"
+                        required
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      Se guarda en USD. Ej.: 1200.00
+                    </p>
+                  </div>
+
+                  {/* Horario */}
+                  <div className="md:col-span-1">
+                    <label className="text-xs font-medium text-gray-600">Horario</label>
+                    <div className="mt-1 flex items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-[#035397]">
+                      <span className="pl-3 pr-2 text-gray-400">
+                        <Clock className="w-4 h-4" />
+                      </span>
+                      <input
+                        type="text"
+                        value={formData.horario || ""}
+                        onChange={(e) => setFormData({ ...formData, horario: e.target.value })}
+                        className="w-full rounded-r-lg px-2 py-2 focus:outline-none"
+                        placeholder="L-V 08:00-16:00"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Centro Médico */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Centro Médico</label>
+                    <div className="mt-1 flex items-center rounded-lg border border-gray-300 focus-within:ring-2 focus-within:ring-[#035397]">
+                      <span className="pl-3 pr-2 text-gray-400">
+                        <Building2 className="w-4 h-4" />
+                      </span>
+                      {centrosMedicos.length > 0 ? (
+                        <select
+                          value={formData.idCentroMedico || ""}
+                          onChange={(e) => setFormData({ ...formData, idCentroMedico: e.target.value })}
+                          className="w-full rounded-r-lg px-2 py-2 bg-white focus:outline-none"
+                          required
+                        >
+                          <option value="" disabled>Seleccionar centro</option>
+                          {centrosMedicos.map((c) => (
+                            <option key={c.idCentroMedico} value={c.idCentroMedico}>
+                              {c.nombre}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="number"
+                          value={formData.idCentroMedico || ""}
+                          onChange={(e) => setFormData({ ...formData, idCentroMedico: e.target.value })}
+                          className="w-full rounded-r-lg px-2 py-2 focus:outline-none"
+                          placeholder="ID centro (numérico)"
+                          required
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Tipo Empleado */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Tipo de Empleado</label>
+                    <select
+                      value={formData.idTipo || ""}
+                      onChange={(e) => setFormData({ ...formData, idTipo: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 bg-white focus:ring-2 focus:ring-[#035397] focus:outline-none"
+                      required
+                    >
+                      <option value="" disabled>Seleccionar tipo</option>
+                      {tiposEmpleado.map((t) => (
+                        <option key={t.idTipo} value={t.idTipo}>{t.tipo}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Especialidad */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Especialidad</label>
+                    <select
+                      value={formData.idEspecialidad || ""}
+                      onChange={(e) => setFormData({ ...formData, idEspecialidad: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 bg-white focus:ring-2 focus:ring-[#035397] focus:outline-none"
+                      required
+                    >
+                      <option value="" disabled>Seleccionar especialidad</option>
+                      {especialidades.map((esp) => (
+                        <option key={esp.idEspecialidad} value={esp.idEspecialidad}>
+                          {esp.nombre}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Estado */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Estado</label>
+                    <select
+                      value={formData.estado || ""}
+                      onChange={(e) => setFormData({ ...formData, estado: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 bg-white focus:ring-2 focus:ring-[#035397] focus:outline-none"
+                      required
+                    >
+                      <option value="" disabled>Seleccionar estado</option>
+                      <option value="Activo">Activo</option>
+                      <option value="Inactivo">Inactivo</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-6 flex items-center justify-end gap-2 border-t pt-4">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#035397] text-white hover:bg-blue-600"
+                  >
+                    <Edit className="w-4 h-4" /> Guardar cambios
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Medico Modal - NUEVO */}
+      {showModal === "viewMedico" && selectedMedico && (
+        <div className="fixed inset-0 z-50">
+          {/* Overlay */}
+          <div
+            className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm"
+            onClick={closeModal}
+          />
+          {/* Card */}
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="w-full max-w-3xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+              {/* Header */}
+              <div className="relative">
+                <div className="h-24 bg-gradient-to-r from-[#035397] via-[#1b66c9] to-[#4aa0ff]" />
+                <button
+                  onClick={closeModal}
+                  className="absolute top-3 right-3 inline-flex items-center justify-center rounded-full p-2 bg-white/90 hover:bg-white shadow"
+                  aria-label="Cerrar"
+                  title="Cerrar"
+                >
+                  <XCircle className="w-5 h-5 text-gray-700" />
+                </button>
+
+                {/* Profile strip */}
+                <div className="px-6 -mt-10 pb-4 flex items-center gap-4">
+                  <div className="shrink-0 rounded-2xl border-4 border-white bg-[#0b3c7d] text-white w-20 h-20 grid place-items-center shadow-lg">
+                    <span className="text-2xl font-bold">
+                      {getInitials(selectedMedico.nombre)}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h3 className="text-xl md:text-2xl font-bold text-gray-900 truncate">
+                        {selectedMedico.nombre}
+                      </h3>
+                      {/* Estado badge grande */}
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm",
+                          selectedMedico.estado === "Activo"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        )}
+                      >
+                        {selectedMedico.estado === "Activo" ? (
+                          <CheckCircle className="w-4 h-4" />
+                        ) : (
+                          <XCircle className="w-4 h-4" />
+                        )}
+                        {selectedMedico.estado}
+                      </span>
+                    </div>
+                    <p className="text-sm text-white/90 mt-1">
+                      {getEspecialidadName(selectedMedico.idEspecialidad)} ·{" "}
+                      {getCentroMedicoName(selectedMedico.idCentroMedico)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="px-6 py-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Col 1 */}
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 p-3 rounded-xl border border-gray-200">
+                      <Phone className="w-5 h-5 text-[#035397] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs text-gray-500">Teléfono</p>
+                        <p className="font-medium text-gray-900">
+                          {selectedMedico.telefono || "No especificado"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-3 rounded-xl border border-gray-200">
+                      <Mail className="w-5 h-5 text-[#035397] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs text-gray-500">Email</p>
+                        <p className="font-medium text-gray-900 break-all">
+                          {selectedMedico.email || "No especificado"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-3 rounded-xl border border-gray-200">
+                      <Clock className="w-5 h-5 text-[#035397] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs text-gray-500">Horario</p>
+                        <p className="font-medium text-gray-900">
+                          {selectedMedico.horario}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Col 2 */}
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 p-3 rounded-xl border border-gray-200">
+                      <User className="w-5 h-5 text-[#035397] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs text-gray-500">Tipo de Empleado</p>
+                        <p className="font-medium text-gray-900">
+                          {/* Si quieres mostrar el label real del idTipo: */}
+                          {(() => {
+                            const t = tiposEmpleado.find(t => t.idTipo === selectedMedico.idTipo);
+                            return t ? t.tipo : `Tipo #${selectedMedico.idTipo}`;
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-3 rounded-xl border border-gray-200">
+                      <Building2 className="w-5 h-5 text-[#035397] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs text-gray-500">Departamento</p>
+                        <p className="font-medium text-gray-900">
+                          {getCentroMedicoName(selectedMedico.idCentroMedico)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-3 rounded-xl border border-gray-200">
+                      <BadgeDollarSign className="w-5 h-5 text-[#035397] shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs text-gray-500">Salario</p>
+                        <p className="font-semibold text-gray-900">
+                          {formatCurrency(selectedMedico.salario)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pill list inferior */}
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-gray-500">Especialidad:</span>
+                  <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+                    {getEspecialidadName(selectedMedico.idEspecialidad)}
+                  </span>
+                  <span className="text-xs text-gray-300">•</span>
+                  <span className="text-xs text-gray-500">Centro:</span>
+                  <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium">
+                    {getCentroMedicoName(selectedMedico.idCentroMedico)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Footer acciones */}
+              <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-between">
+                <p className="text-xs text-gray-500">
+                  ID Empleado: <span className="font-mono">{selectedMedico.idEmpleado}</span>
+                </p>
+                <div className="flex gap-2">
+                  {isAdmin() && (
+                    <>
+                      <button
+                        onClick={() => openModal("editMedico", selectedMedico)}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#035397] text-white hover:bg-blue-600"
+                      >
+                        <Edit className="w-4 h-4" /> Editar
+                      </button>
+                      {selectedMedico.estado === "Activo" ? (
+                        <button
+                          onClick={() => openModal("deleteMedico", selectedMedico)}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white hover:bg-amber-700"
+                        >
+                          <XCircle className="w-4 h-4" /> Inactivar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={async () => {
+                            // reactivar rápido desde aquí
+                            try {
+                              let res = await safeFetch(`/medicos/${selectedMedico.idEmpleado}`, {
+                                method: "PATCH",
+                                headers: getAuthHeaders(),
+                                body: JSON.stringify({ estado: "Activo" }),
+                              });
+                              if (!res.ok) {
+                                res = await safeFetch(`/medicos/${selectedMedico.idEmpleado}`, {
+                                  method: "PUT",
+                                  headers: getAuthHeaders(),
+                                  body: JSON.stringify({ ...selectedMedico, estado: "Activo" }),
+                                });
+                              }
+                              if (!res.ok) throw new Error();
+                              setNotification({ message: "Médico reactivado.", type: "success" });
+                              fetchData();
+                              closeModal();
+                            } catch {
+                              setNotification({ message: "No se pudo reactivar.", type: "error" });
+                            }
+                          }}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                          <CheckCircle className="w-4 h-4" /> Reactivar
+                        </button>
+                      )}
+                    </>
+                  )}
+                  <button
+                    onClick={closeModal}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100"
+                  >
+                    Cerrar
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1075,8 +1418,8 @@ const MedicosManagement: React.FC = () => {
       {showModal === "deleteMedico" && selectedMedico && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold mb-4">Eliminar Médico</h2>
-            <p>¿Estás seguro de eliminar a {selectedMedico.nombre}?</p>
+            <h2 className="text-xl font-bold mb-4">Inactivar Médico</h2>
+            <p>¿Estás seguro de <strong>inactivar</strong> a {selectedMedico.nombre}? Este cambio no elimina el registro.</p>
             <div className="flex justify-end space-x-2 mt-4">
               <button
                 onClick={closeModal}
@@ -1086,125 +1429,169 @@ const MedicosManagement: React.FC = () => {
               </button>
               <button
                 onClick={handleDeleteMedico}
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                className="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700"
               >
-                Eliminar
+                Inactivar
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Especialidades Modals */}
+      {/* Create Especialidad Modal - NUEVO (reemplaza el actual) */}
       {showModal === "createEspecialidad" && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold mb-4">Crear Especialidad</h2>
-            <form onSubmit={handleCreateEspecialidad}>
-              <input
-                type="text"
-                placeholder="Nombre"
-                value={formData.nombre || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, nombre: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              />
-              <textarea
-                placeholder="Descripción"
-                value={formData.descripcion || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, descripcion: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                rows={3}
-              />
-              <div className="flex justify-end space-x-2 mt-4">
+        <div className="fixed inset-0 z-50">
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm" onClick={closeModal} />
+          {/* Card */}
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+              {/* Header */}
+              <div className="relative">
+                <div className="h-20 bg-gradient-to-r from-[#035397] via-[#1b66c9] to-[#4aa0ff]" />
                 <button
-                  type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                  className="absolute top-3 right-3 inline-flex items-center justify-center rounded-full p-2 bg-white/90 hover:bg-white shadow"
+                  aria-label="Cerrar"
+                  title="Cerrar"
                 >
-                  Cancelar
+                  <XCircle className="w-5 h-5 text-gray-700" />
                 </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-[#035397] text-white rounded hover:bg-blue-600"
-                >
-                  Crear
-                </button>
+                <div className="px-6 -mt-8 pb-2">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white shadow-md ring-1 ring-black/5">
+                    <Stethoscope className="w-7 h-7 text-[#035397]" />
+                  </div>
+                </div>
               </div>
-            </form>
+
+              {/* Body */}
+              <form onSubmit={handleCreateEspecialidad} className="px-6 py-5">
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Nombre */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Nombre</label>
+                    <input
+                      type="text"
+                      value={formData.nombre || ""}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-[#035397] focus:outline-none"
+                      placeholder="Nombre de la especialidad"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-6 flex items-center justify-end gap-2 border-t pt-4">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#035397] text-white hover:bg-blue-600"
+                  >
+                    <Plus className="w-4 h-4" /> Crear
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
-
       {showModal === "viewEspecialidad" && selectedEspecialidad && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold mb-4">Ver Especialidad</h2>
-            <div className="space-y-2">
-              <p>
-                <strong>Nombre:</strong> {selectedEspecialidad.nombre}
-              </p>
-              <p>
-                <strong>Descripción:</strong>{" "}
-                {selectedEspecialidad.descripcion || "Sin descripción"}
-              </p>
-            </div>
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={closeModal}
-                className="px-4 py-2 bg-[#035397] text-white rounded hover:bg-blue-600"
-              >
-                Cerrar
-              </button>
+        <div className="fixed inset-0 z-50">
+          <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm" onClick={closeModal} />
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+              <div className="h-20 bg-gradient-to-r from-[#035397] via-[#1b66c9] to-[#4aa0ff]" />
+              <div className="px-6 -mt-8 pb-2">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white shadow-md ring-1 ring-black/5">
+                  <Stethoscope className="w-7 h-7 text-[#035397]" />
+                </div>
+              </div>
+              <div className="px-6 pb-4">
+                <h3 className="text-xl font-bold text-gray-900">{selectedEspecialidad.nombre}</h3>
+                {selectedEspecialidad.descripcion && (
+                  <p className="mt-2 text-sm text-gray-600">{selectedEspecialidad.descripcion}</p>
+                )}
+              </div>
+              <div className="px-6 py-3 bg-gray-50 border-t flex justify-end">
+                <button
+                  onClick={closeModal}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100"
+                >
+                  Cerrar
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
+      {/* Edit Especialidad Modal - NUEVO */}
       {showModal === "editEspecialidad" && selectedEspecialidad && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
-            <h2 className="text-xl font-bold mb-4">Editar Especialidad</h2>
-            <form onSubmit={handleUpdateEspecialidad}>
-              <input
-                type="text"
-                placeholder="Nombre"
-                value={formData.nombre || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, nombre: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                required
-              />
-              <textarea
-                placeholder="Descripción"
-                value={formData.descripcion || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, descripcion: e.target.value })
-                }
-                className="w-full p-2 border rounded mb-2"
-                rows={3}
-              />
-              <div className="flex justify-end space-x-2 mt-4">
+        <div className="fixed inset-0 z-50">
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm" onClick={closeModal} />
+          {/* Card */}
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 overflow-hidden">
+              {/* Header */}
+              <div className="relative">
+                <div className="h-20 bg-gradient-to-r from-[#035397] via-[#1b66c9] to-[#4aa0ff]" />
                 <button
-                  type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                  className="absolute top-3 right-3 inline-flex items-center justify-center rounded-full p-2 bg-white/90 hover:bg-white shadow"
+                  aria-label="Cerrar"
+                  title="Cerrar"
                 >
-                  Cancelar
+                  <XCircle className="w-5 h-5 text-gray-700" />
                 </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-[#035397] text-white rounded hover:bg-blue-600"
-                >
-                  Actualizar
-                </button>
+                <div className="px-6 -mt-8 pb-2">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white shadow-md ring-1 ring-black/5">
+                    <Stethoscope className="w-7 h-7 text-[#035397]" />
+                  </div>
+                </div>
               </div>
-            </form>
+
+              {/* Body */}
+              <form onSubmit={handleUpdateEspecialidad} className="px-6 py-5">
+                <div className="grid grid-cols-1 gap-4">
+                  {/* Nombre */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-600">Nombre</label>
+                    <input
+                      type="text"
+                      value={formData.nombre || ""}
+                      onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+                      className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-[#035397] focus:outline-none"
+                      placeholder="Nombre de la especialidad"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-6 flex items-center justify-end gap-2 border-t pt-4">
+                  <button
+                    type="button"
+                    onClick={closeModal}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-100"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#035397] text-white hover:bg-blue-600"
+                  >
+                    <Edit className="w-4 h-4" /> Guardar cambios
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

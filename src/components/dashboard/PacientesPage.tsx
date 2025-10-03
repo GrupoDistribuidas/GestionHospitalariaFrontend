@@ -436,13 +436,6 @@ const PacientesPage: React.FC = () => {
                             >
                               <Edit className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => openModal("delete", p)}
-                              title="Eliminar"
-                              className="inline-flex items-center rounded-md p-2 text-gray-600 hover:text-red-700 hover:bg-red-600/10 focus:outline-none focus:ring-2 focus:ring-red-600/30"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
                           </div>
                         </td>
                       </tr>
