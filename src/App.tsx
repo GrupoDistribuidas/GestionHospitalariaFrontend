@@ -4,12 +4,12 @@ import ForgotPasswordScreen from "./components/auth/ForgotPasswordScreen";
 import Layout from "./components/layout/Layout";
 import Dashboard from "./components/dashboard/Dashboard";
 import MedicosManagement from "./components/dashboard/MedicosManagement";
-import UsuariosManagement from "./components/dashboard/UsuariosManagement";
 import PerfilPersonal from "./components/dashboard/PerfilPersonal";
 import ConsultationReports from "./components/consultationReport/ConsultationReports";
 import PacientesPage from "./components/dashboard/PacientesPage"; // 👈 NUEVO
 import CreateAppointment from "./components/dashboard/CreateAppointment";
 import CalendarView from "./components/calendar/CalendarView";
+import GestionUsuarios from "./components/dashboard/GestionUsuarios";
 
 function App() {
   return (
@@ -42,7 +42,7 @@ function App() {
           path="/usuarios"
           element={
             <Layout>
-              <UsuariosManagement />
+              <GestionUsuarios />
             </Layout>
           }
         />
