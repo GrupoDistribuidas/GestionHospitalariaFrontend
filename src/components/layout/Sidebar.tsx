@@ -202,13 +202,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isMobileOpen = false, onClose }) => {
                     label="Gestión de Citas"
                   />
                 )}
-
-                {/* Nueva pantalla: gestión completa de consultas (listado, CRUD) */}
-                <LinkItem
-                  to="/consultas"
-                  icon={<FileText className="w-5 h-5" />}
-                  label="Consultas"
-                />
               </ul>
             )}
           </div>
