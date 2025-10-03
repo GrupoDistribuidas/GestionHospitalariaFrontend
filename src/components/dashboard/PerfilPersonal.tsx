@@ -229,7 +229,7 @@ const PerfilPersonal: React.FC = () => {
             <Briefcase className="w-5 h-5" /> Resumen Profesional
           </h3>
           <div className="space-y-3 text-sm">
-            <p className="flex items-start gap-2">
+            <div className="flex items-start gap-2">
               <div className="mt-0.5">
                 <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-blue-50 text-blue-800">
                   {perfil.rol}
@@ -243,7 +243,7 @@ const PerfilPersonal: React.FC = () => {
                   Permisos y responsabilidades asociados al rol.
                 </div>
               </div>
-            </p>
+            </div>
 
             {/* Ubicación y horario ocultados para una presentación más limpia */}
 

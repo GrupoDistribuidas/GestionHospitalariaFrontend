@@ -16,7 +16,9 @@ interface Medico {
   especialidad?: string;
 }
 
-const CreateAppointment: React.FC = () => {
+const CreateAppointment: React.FC<{ onSuccess?: (res?: any) => void }> = ({
+  onSuccess,
+}) => {
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
   const [loading, setLoading] = useState(true);
@@ -220,9 +222,10 @@ const CreateAppointment: React.FC = () => {
 
       // No hacemos pre-checks al servidor (evita llamar endpoints individuales que producen 500).
       // Enviamos el POST y delegamos la validación final al backend.
-      await appointmentsService.crearCita(payload);
+      const res = await appointmentsService.crearCita(payload);
 
       setNotification({ message: "Cita creada con éxito.", type: "success" });
+      if (onSuccess) onSuccess(res);
       // reset form
       setForm({
         id_paciente: "",
