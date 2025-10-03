@@ -71,6 +71,59 @@ class AppointmentsService {
 
     return res.json();
   }
+
+  async fetchConsultaById(id: number) {
+    const res = await safeFetch(`/consultas/${id}`, {
+      method: "GET",
+      headers: this.headers(),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Error cargando consulta ${id}: ${res.status} ${text}`);
+    }
+
+    return res.json();
+  }
+
+  async actualizarCita(id: number, payload: Partial<CreateAppointmentPayload>) {
+    const bodyToSend: any = {
+      fecha: payload.fecha,
+      hora: payload.hora,
+      motivo: payload.motivo,
+      diagnostico: payload.diagnostico ?? "",
+      tratamiento: payload.tratamiento ?? "",
+      idPaciente: payload.idPaciente,
+      idMedico: payload.idMedico,
+    };
+
+    const res = await safeFetch(`/consultas/${id}`, {
+      method: "PUT",
+      headers: this.headers(),
+      body: JSON.stringify(bodyToSend),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Error actualizando cita ${id}: ${res.status} ${text}`);
+    }
+
+    return res.json();
+  }
+
+  async eliminarCita(id: number) {
+    const res = await safeFetch(`/consultas/${id}`, {
+      method: "DELETE",
+      headers: this.headers(),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Error eliminando cita ${id}: ${res.status} ${text}`);
+    }
+
+    return res.json();
+  }
 }
 
 export const appointmentsService = new AppointmentsService();

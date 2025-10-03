@@ -10,6 +10,7 @@ import ConsultationReports from "./components/consultationReport/ConsultationRep
 import PacientesPage from "./components/dashboard/PacientesPage"; // 👈 NUEVO
 import CreateAppointment from "./components/dashboard/CreateAppointment";
 import CalendarView from "./components/calendar/CalendarView";
+import ConsultasManagement from "./components/dashboard/ConsultasManagement";
 
 function App() {
   return (
@@ -70,6 +71,15 @@ function App() {
           element={
             <Layout>
               <CreateAppointment />
+            </Layout>
+          }
+        />
+
+        <Route
+          path="/consultas"
+          element={
+            <Layout>
+              <ConsultasManagement />
             </Layout>
           }
         />
