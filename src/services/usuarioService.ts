@@ -8,6 +8,7 @@ import type {
   EmpleadoOption 
 } from '../types/usuario';
 import { API_BASE } from '../config/api';
+import { data } from 'react-router-dom';
 
 export class UsuarioService {
   private getAuthHeaders(): HeadersInit {
@@ -85,11 +86,12 @@ export class UsuarioService {
    */
   async createUsuario(usuario: CreateUsuarioRequest): Promise<void> {
     try {
-      const response = await fetch(`${API_BASE}/Usuarios/${usuario.idEmpleado}`, {
+      const response = await fetch(`${API_BASE}/Usuarios/`, {
         method: 'POST',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(usuario)
       });
+        console.log('Creating usuario with data:', usuario);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -205,7 +207,7 @@ export class UsuarioService {
       // Mapear médicos a empleados y marcar cuáles tienen usuario
       const empleados: EmpleadoOption[] = medicos.map(medico => ({
         idEmpleado: medico.idEmpleado,
-        nombre: medico.nombreMedico,
+        nombre: medico.nombre,
         hasUser: empleadosConUsuario.has(medico.idEmpleado)
       }));
 
