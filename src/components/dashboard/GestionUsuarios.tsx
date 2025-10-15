@@ -123,7 +123,7 @@ const GestionUsuarios: React.FC = () => {
   // Filtrar empleados según búsqueda
   useEffect(() => {
     try {
-      if (!empleadoSearchTerm.trim()) {
+      if (!empleadoSearchTerm?.trim()) {
         setFilteredEmpleados(empleadosDisponibles.filter(emp => !emp.hasUser));
       } else {
         const filtered = empleadosDisponibles.filter(empleado =>
@@ -197,14 +197,17 @@ const GestionUsuarios: React.FC = () => {
 
   const handleCreate = async () => {
     setError('');
-    
-    // Validar datos
+    // Validar longitud mínima de contraseña
+    if (!createForm.contraseña || createForm.contraseña.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres');
+      return;
+    }
+    // Validar otros datos
     const errors = usuarioService.validateUsuarioData(createForm);
     if (errors.length > 0) {
       setError(errors.join(', '));
       return;
     }
-
     try {
       await usuarioService.createUsuario(createForm);
       setShowCreateModal(false);
@@ -539,7 +542,7 @@ const GestionUsuarios: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contraseña (máx. 12 caracteres)
+                  Contraseña (mín. 6, máx. 12 caracteres)
                 </label>
                 <input
                   type="password"
@@ -549,6 +552,9 @@ const GestionUsuarios: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Ingrese contraseña"
                 />
+                {createForm.contraseña && createForm.contraseña.length > 0 && createForm.contraseña.length < 6 && (
+                  <div className="mt-1 text-xs text-red-600">La contraseña debe tener al menos 6 caracteres</div>
+                )}
               </div>
 
               <div>

@@ -44,7 +44,7 @@ export interface UpdateUsuarioRequest {
 
 export interface Medico {
   idMedico: number;
-  nombreMedico: string;
+  nombre: string;
   especialidad: string;
   idEmpleado: number;
 }
