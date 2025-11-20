@@ -8,9 +8,4 @@ export default {
     extend: {},
   },
   plugins: [],
-  // Purge CSS no utilizado
-  purge: {
-    enabled: true,
-    content: ['./src/**/*.{js,jsx,ts,tsx}']
-  }
 }

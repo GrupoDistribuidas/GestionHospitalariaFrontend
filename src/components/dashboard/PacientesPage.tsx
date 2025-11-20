@@ -12,7 +12,6 @@ import {
   Plus,
   Eye,
   Edit,
-  Trash2,
   AlertCircle,
   Loader2,
   XCircle,

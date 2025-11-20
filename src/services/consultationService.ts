@@ -342,6 +342,7 @@ export class ConsultationService {
    * @param filters - Filtros del formulario
    * @returns string
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private buildQueryParams(filters: FilterFormData): string {
     const params = new URLSearchParams();
 
@@ -359,6 +360,7 @@ export class ConsultationService {
    * @param format - Formato de exportación
    * @returns string
    */
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private getAcceptHeader(format: string): string {
     switch (format) {
       case "csv":

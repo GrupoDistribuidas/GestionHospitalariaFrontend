@@ -343,7 +343,7 @@ export class ExportService {
     // Configuración de colores profesionales
     const primaryColor: [number, number, number] = [59, 130, 246]; // Blue suave (#3b82f6)
     const secondaryColor: [number, number, number] = [71, 85, 105]; // Slate
-    const accentColor: [number, number, number] = [6, 182, 212]; // Cyan
+    // const accentColor: [number, number, number] = [6, 182, 212]; // Cyan
     
     // Header con logo y título
     doc.setFillColor(...primaryColor);
@@ -443,7 +443,7 @@ export class ExportService {
           overflow: 'linebreak',
           cellWidth: 'wrap'
         },
-        didDrawPage: (data) => {
+        didDrawPage: () => {
           // Footer en cada página
           const pageCount = doc.getNumberOfPages();
           const currentPage = (doc as any).internal.getCurrentPageInfo().pageNumber;

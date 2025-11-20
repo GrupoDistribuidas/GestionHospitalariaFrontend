@@ -9,7 +9,6 @@ import {
   Clock,
   Plus,
   Edit,
-  Trash2,
 } from "lucide-react";
 import { getCurrentUserEmpleadoId } from "../../services/auth";
 
@@ -37,10 +36,14 @@ type Consulta = {
   estado?: string;
 };
 
+interface CreateAppointmentProps {
+  onSuccess?: (res: any) => void;
+}
+
 type ModalKind = "none" | "create" | "edit" | "delete";
 const idMedico = getCurrentUserEmpleadoId(); // number | null
 
-const AppointmentsWithModals: React.FC = () => {
+const AppointmentsWithModals: React.FC<CreateAppointmentProps> = ({ onSuccess }) => {
 
   const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [medicos, setMedicos] = useState<Medico[]>([]);
@@ -276,10 +279,10 @@ const AppointmentsWithModals: React.FC = () => {
     setModal("edit");
   };
 
-  const openDelete = (c: Consulta) => {
-    setSelected(c);
-    setModal("delete");
-  };
+  // const openDelete = (c: Consulta) => {
+  //   setSelected(c);
+  //   setModal("delete");
+  // };
 
   const closeModal = () => {
     setModal("none");
@@ -428,8 +431,9 @@ const AppointmentsWithModals: React.FC = () => {
       };
 
       if (modal === "create") {
-        await apiCreate(payload);
+        const res = await apiCreate(payload);
         setNotification({ type: "success", message: "Cita creada con éxito." });
+        if (onSuccess) onSuccess(res);
       } else if (modal === "edit" && selected) {
         await apiUpdate(selected.id, payload);
         setNotification({ type: "success", message: "Cita actualizada." });
@@ -447,21 +451,21 @@ const AppointmentsWithModals: React.FC = () => {
     }
   };
 
-  const confirmDelete = async () => {
-    if (!selected) return;
-    try {
-      await apiDelete(selected.id);
-      setNotification({ type: "success", message: "Cita eliminada." });
-      closeModal();
-      await fetchConsultas();
-    } catch (err: any) {
-      console.error(err);
-      setNotification({
-        type: "error",
-        message: err?.message || "No se pudo eliminar la cita.",
-      });
-    }
-  };
+  // const confirmDelete = async () => {
+  //   if (!selected) return;
+  //   try {
+  //     await apiDelete(selected.id);
+  //     setNotification({ type: "success", message: "Cita eliminada." });
+  //     closeModal();
+  //     await fetchConsultas();
+  //   } catch (err: any) {
+  //     console.error(err);
+  //     setNotification({
+  //       type: "error",
+  //       message: err?.message || "No se pudo eliminar la cita.",
+  //     });
+  //   }
+  // };
 
   // ======== RENDER ========
 
@@ -554,12 +558,12 @@ const AppointmentsWithModals: React.FC = () => {
                       }`
                     : `#${c.idMedico}`;
 
-                  const estado = (c.estado ?? "").toString().toLowerCase();
-                  const isOk =
-                    estado === "asistida" ||
-                    estado === "realizada" ||
-                    estado === "confirmada" ||
-                    estado === "completada";
+                  // const estado = (c.estado ?? "").toString().toLowerCase();
+                  // const isOk =
+                  //   estado === "asistida" ||
+                  //   estado === "realizada" ||
+                  //   estado === "confirmada" ||
+                  //   estado === "completada";
 
                   return (
                     <tr key={`${c.id}-${idx}`} className="hover:bg-gray-50">

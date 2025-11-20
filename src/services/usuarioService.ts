@@ -8,7 +8,6 @@ import type {
   EmpleadoOption 
 } from '../types/usuario';
 import { API_BASE } from '../config/api';
-import { data } from 'react-router-dom';
 
 export class UsuarioService {
   private getAuthHeaders(): HeadersInit {
