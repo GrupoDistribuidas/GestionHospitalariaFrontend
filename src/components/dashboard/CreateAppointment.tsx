@@ -11,6 +11,7 @@ import {
   Edit,
   Trash2,
 } from "lucide-react";
+import { getCurrentUserEmpleadoId } from "../../services/auth";
 
 interface Paciente {
   id: number;
@@ -37,6 +38,7 @@ type Consulta = {
 };
 
 type ModalKind = "none" | "create" | "edit" | "delete";
+const idMedico = getCurrentUserEmpleadoId(); // number | null
 
 const AppointmentsWithModals: React.FC = () => {
 
@@ -159,7 +161,7 @@ const AppointmentsWithModals: React.FC = () => {
         data = await (appointmentsService as any).getAll();
       } else {
         // Fallbacks comunes
-        let res = await safeFetch("/consultas", { headers });
+        let res = await safeFetch(`/consultas/medico/${idMedico}`, { headers });
         if (!res.ok) {
           res = await safeFetch("/citas", { headers });
         }
@@ -223,6 +225,7 @@ const AppointmentsWithModals: React.FC = () => {
   };
 
   const medicosHabilitados = useMemo<Medico[]>(() => {
+
     return medicos.filter((m) => {
       const normalized = String(
         typeof m.estado === "boolean"
@@ -420,8 +423,8 @@ const AppointmentsWithModals: React.FC = () => {
         motivo: form.motivo,
         diagnostico: form.diagnostico ?? "",
         tratamiento: form.tratamiento ?? "",
-        idPaciente: idPacienteNum,
-        idMedico: idMedicoNum,
+        id_paciente: idPacienteNum,
+        id_medico: idMedicoNum,
       };
 
       if (modal === "create") {
@@ -539,7 +542,7 @@ const AppointmentsWithModals: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {consultas.map((c) => {
+                {consultas.map((c, idx) => {
                   const pac = pacientesById.get(c.idPaciente);
                   const med = medicosById.get(c.idMedico);
                   const nombrePac = pac
@@ -559,7 +562,7 @@ const AppointmentsWithModals: React.FC = () => {
                     estado === "completada";
 
                   return (
-                    <tr key={c.id} className="hover:bg-gray-50">
+                    <tr key={`${c.id}-${idx}`} className="hover:bg-gray-50">
                       <td className="px-6 py-3 text-sm text-gray-900">
                         {fmtFecha(c.fecha)}
                       </td>
@@ -672,7 +675,7 @@ const AppointmentsWithModals: React.FC = () => {
                         : "border-gray-300"
                     }`}
                   >
-                    <option value="">-- Seleccione médico --</option>
+                    <option value="">Seleccione médico </option>
                     {medicosHabilitados.map((m) => (
                       <option key={m.id} value={String(m.id)}>
                         {`${m.nombre} ${m.apellido}${

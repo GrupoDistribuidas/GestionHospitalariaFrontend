@@ -74,7 +74,7 @@ class AppointmentsService {
 
   async fetchConsultaById(id: number) {
     if (!id || id <= 0) throw new Error(`Consulta id inválido: ${id}`);
-    const res = await safeFetch(`/consultas/${id}`, {
+    const res = await safeFetch(`/consultas/medico/${id}`, {
       method: "GET",
       headers: this.headers(),
     });
